@@ -179,8 +179,8 @@ everything else.
 {
   "permissions": {
     "allow": [
-      "Bash(git :*)",
-      "Bash(gh :*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
       "Read",
       "Write",
       "Edit",
@@ -197,6 +197,12 @@ leaves `Bash` refusing, so the run cannot use git or the host CLI and fails in a
 way that reads like a sulking agent. Grant the commands explicitly, then read
 `permission_denials` in the run's JSON to find what you missed — it names the
 exact tool and command.
+
+Write the rules as `Bash(gh:*)`, with no space before the colon. `Bash(gh :*)`
+looks equivalent, matches nothing, and fails exactly like a missing rule — every
+call denied, with no hint that the pattern rather than the grant is at fault.
+After the first run, read `permission_denials` in its JSON: it prints the command
+verbatim, which is the fastest way to see what a rule failed to cover.
 
 Prefer that to `--dangerously-skip-permissions`. The agent's input is issue text
 written by other people; an unattended run acting on untrusted input is the one
