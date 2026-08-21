@@ -8,7 +8,7 @@ argument-hint: [repo path]
 
 **This is a setup skill.** You are building a pipeline, not running one: create
 the labels, write the queue command and the runner script, and stop. The prose the
-*working* agent reads is `references/work.md`, which you copy into the project —
+_working_ agent reads is `references/work.md`, which you copy into the project —
 it addresses that agent, not you.
 
 Turn a repository into one an agent can work from a queue: **you label an issue, a
@@ -43,16 +43,32 @@ the wrong thing being built before any code exists to inherit the mistake.
 Work these out from the repo and state what you found. Asking about things that
 are written down is friction.
 
-| What | Where to look |
-|---|---|
-| Check command | `Makefile` (`check`, `test`, `ci`), `package.json` scripts, `justfile`, `Taskfile`, `tox.ini`, `noxfile.py`, CI workflow steps |
-| Install command | Lockfile present: `npm ci`, `pnpm i --frozen-lockfile`, `uv sync`, `poetry install`, `bundle install` |
-| Spec convention | `specs/`, `features/`, `docs/adr/`, existing test layout and naming |
-| Pending mechanism | How the suite marks not-yet-implemented: a tag treated as todo, `skip`, `xfail`, `pending` |
-| Version file | `package.json`, `pyproject.toml`, `Cargo.toml`, `*.gemspec` — and whether it is even versioned |
-| Repo and default branch | `git remote -v`, `git symbolic-ref refs/remotes/origin/HEAD` |
-| Brief file | `CLAUDE.md`, `AGENTS.md`, `CONVENTIONS.md` — extend it, never overwrite |
-| `.claude` ignored? | `git check-ignore -v .claude` — a global ignore is common and changes how you commit the command |
+| What                    | Where to look                                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Check command           | `Makefile` (`check`, `test`, `ci`), `package.json` scripts, `justfile`, `Taskfile`, `tox.ini`, `noxfile.py`, CI workflow steps |
+| Install command         | Lockfile present: `npm ci`, `pnpm i --frozen-lockfile`, `uv sync`, `poetry install`, `bundle install`                          |
+| Spec convention         | Three-way, see below — it decides what the queue command tells a run to do                                                     |
+| Pending mechanism       | How the suite marks not-yet-implemented: a tag treated as todo, `skip`, `xfail`, `pending`                                     |
+| Version file            | `package.json`, `pyproject.toml`, `Cargo.toml`, `*.gemspec` — and whether it is even versioned                                 |
+| Repo and default branch | `git remote -v`, `git symbolic-ref refs/remotes/origin/HEAD`                                                                   |
+| Brief file              | `CLAUDE.md`, `AGENTS.md`, `CONVENTIONS.md` — extend it, never overwrite                                                        |
+| `.claude` ignored?      | `git check-ignore -v .claude` — a global ignore is common and changes how you commit the command                               |
+
+### The spec convention is a three-way test
+
+Whatever a run writes must look like what is already there, so establish which of
+these the project is before writing anything:
+
+1. **Already using the `/spec` skill** — `specs/INDEX.md` exists and
+   `specs/features/` holds `<slug>.feature` paired with `<slug>.md`. Distinctive
+   enough to be conclusive. The queue command should name the skill: it knows the
+   layout, the ADR conventions and the index, and will keep them in step.
+2. **Some other convention** — a `features/` folder, specs in `docs/`, a test
+   layout with an obvious house style. Do not impose a new one. Read enough of it
+   to describe it in a sentence, and put that sentence in the queue command:
+   where the files go, what they are called, what a good one looks like.
+3. **Nothing at all** — no specs anywhere. See below; this is a question, not a
+   default.
 
 ## Step 1 — ask only the decisions
 
@@ -64,6 +80,15 @@ At most two questions, each with a recommendation:
 2. **Does the agent implement, or only spec?** With the gate above, the second
    stage needs its own trigger label; without it, one run does both. Either way
    the runner is the same script.
+
+And one more, but only when Step 0 found no specs at all:
+
+3. **Shall we start a spec set?** Offer to run `/spec` now — with a codebase
+   present it reverse-engineers specs from the code, which gives the pipeline a
+   convention to follow and the repo something to review against. It is an offer,
+   not a step: a project can decline and keep its own shape. If it declines, the
+   spec gate has nothing to gate, so drop stage one and let a label go straight to
+   a build.
 
 ## Step 2 — the labels
 
@@ -95,7 +120,10 @@ detected. It must say, in this order:
 - **Work in a worktree**, never the shared clone. No stashing, no resetting, no
   branch switching in someone else's checkout.
 - **The stage itself**, in the project's own terms — its check command, its spec
-  layout, its pending mechanism, its version file.
+  layout, its pending mechanism, its version file. Substitute the spec method that
+  Step 0 established: name the `/spec` skill if the project uses it, otherwise
+  describe the convention that is there. Never leave it as "write a spec" — a run
+  with no house style invents one, and every run invents a different one.
 - **Hand back**: push, open or update the PR, comment, swap the label to the
   review rung. Never merge. Never push the default branch.
 - **Fail loudly**: `agent:blocked` and a comment saying what is needed. Say where
@@ -145,10 +173,16 @@ in the project's settings, where it is version-controlled and reviewable:
 {
   "permissions": {
     "allow": [
-      "Bash(git :*)", "Bash(gh :*)", "Read", "Write", "Edit", "Glob", "Grep"
+      "Bash(git :*)",
+      "Bash(gh :*)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
       // plus the project's own install, check and build commands
-    ]
-  }
+    ],
+  },
 }
 ```
 
