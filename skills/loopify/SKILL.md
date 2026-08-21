@@ -153,6 +153,13 @@ gh issue list …          # free, so poll as often as you like
 claude -p "/work" …      # only when there is work; exits by itself when done
 ```
 
+Stream it. `--output-format json` prints nothing until the run ends, which for an
+implementation is eight silent minutes and no way to tell working from wedged.
+`--output-format stream-json --verbose` emits an event per step; `tee` it to the
+log and pipe it through something that prints one line each. Keep that filter
+incapable of failing — it is downstream of the run, and a narrator that dies
+takes the run with it.
+
 `claude -p` is non-interactive and returns when the turn completes, so each run is
 a separate process that starts, does one stage, pushes and exits. Nothing is kept
 alive between runs, nothing accumulates context, and a wedged run cannot poison

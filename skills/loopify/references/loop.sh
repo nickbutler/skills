@@ -105,6 +105,45 @@ queue() {
     | sort_by(.number) | first | .number // empty'
 }
 
+# `--output-format json` says nothing until the run ends, which for a build is
+# eight silent minutes. `stream-json` emits an event per step instead; this turns
+# those into one readable line each, while `tee` keeps the raw stream for the log.
+# Never exits early or non-zero: it is downstream of the run, and a narrator that
+# dies would take the run with it.
+narrate() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    cat >/dev/null
+    return 0
+  fi
+  python3 -c '
+import sys, json
+
+def short(v):
+    return " ".join(str(v).split())[:96]
+
+for line in sys.stdin:
+    try:
+        event = json.loads(line)
+    except Exception:
+        continue
+    try:
+        kind = event.get("type")
+        if kind == "assistant":
+            for block in event.get("message", {}).get("content", []):
+                if block.get("type") == "tool_use":
+                    args = block.get("input", {}) or {}
+                    detail = args.get("command") or args.get("file_path") or args.get("pattern") or ""
+                    print("   .", block.get("name"), short(detail), flush=True)
+                elif block.get("type") == "text" and block.get("text", "").strip():
+                    print("    ", short(block["text"]), flush=True)
+        elif kind == "result":
+            print("   =", event.get("subtype"), str(event.get("num_turns")), "turns",
+                  "$" + str(round(event.get("total_cost_usd") or 0, 2)), flush=True)
+    except Exception:
+        continue
+' 2>/dev/null || cat >/dev/null
+}
+
 echo "watching $REPO — build before approved, ${IDLE}s when idle"
 
 while :; do
@@ -124,7 +163,8 @@ while :; do
   # whether it is worth waking anything at all.
   if "${CAP[@]}" claude -p "/work" \
     --permission-mode acceptEdits \
-    --output-format json >"$log"; then
+    --output-format stream-json --verbose |
+    tee "$log" | narrate; then
 
     # Exiting zero is not evidence of work. A run blocked on a permission it
     # cannot be granted non-interactively reports success, having done nothing —
@@ -138,7 +178,7 @@ while :; do
         --remove-label approved --remove-label build \
         --add-label agent:blocked >/dev/null 2>&1 || true
       gh issue comment "$issue" --repo "$REPO" \
-        --body "A run finished without claiming this — usually a tool it was not permitted to use. Log: \`$log\`. Check \`permission_denials\` in it before trying again." \
+        --body "A run finished without claiming this — usually a tool it was not permitted to use. Log: \`$log\` (newline-delimited events; the last line holds \`permission_denials\`)." \
         >/dev/null 2>&1 || true
     else
       echo "issue #$issue — finished"
