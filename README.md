@@ -20,6 +20,7 @@ Or clone and symlink the ones you want into `~/.agents/skills/`.
 |-------|--------------|
 | `commit-msg` | Generates a commit message from the working diff into the repo's `NEXT_COMMITMSG`, pre-populating the next manual commit. |
 | `diagnosing-bugs` | No fix without root cause: build a red-capable feedback loop, rank falsifiable hypotheses, fix via failing test. |
+| `loopify` | Sets up an agent loop that turns labelled issues into reviewed pull requests — label ladder, queue command, worktree isolation, PR gate. |
 | `scrollytelling` | Builds a public "How it works" scrollytelling page inside an app — narrative chapters, scroll-driven animation, content-contract test. |
 | `spec` | Maintains a `specs/` folder of features with Gherkin BDD acceptance criteria; creates, infers from code, or reconciles drift. |
 | `web-deck` | Builds a presentation as a bespoke single-file web app — stepped scrollytelling canvas, markdown content layer, print-to-PDF. |
