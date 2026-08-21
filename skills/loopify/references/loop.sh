@@ -12,6 +12,15 @@
 #
 set -euo pipefail
 
+# Everything this script says is stamped. A loop is read long after it ran —
+# from a launchd log, or in the morning — and "which run was that, and how long
+# did it sit there" is the question being asked. Full date on the script's own
+# lines, which are few; time only on the narrator's, which are many and always
+# inside a run whose start line already carries the date.
+stamp() { date "+%Y-%m-%d %H:%M:%S"; }
+say() { printf '%s  %s\n' "$(stamp)" "$*"; }
+warn() { printf '%s  %s\n' "$(stamp)" "$*" >&2; }
+
 # Work from the repository root whatever directory this was started in: the paths
 # below are relative to it, and so are the worktrees.
 cd "$(git rev-parse --show-toplevel)" || exit 1
@@ -21,7 +30,7 @@ cd "$(git rev-parse --show-toplevel)" || exit 1
 # there is a real choice to make.
 REPO="${REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)}"
 if [ -z "$REPO" ]; then
-  echo "cannot work out which repository this is — run it inside one, or set REPO=owner/name" >&2
+  warn "cannot work out which repository this is — run it inside one, or set REPO=owner/name"
   exit 1
 fi
 IDLE="${IDLE:-300}"          # seconds between polls when the queue is empty
@@ -40,24 +49,24 @@ if [ -z "${SKIP_PREFLIGHT:-}" ]; then
   settings=$(ls .claude/settings.json .claude/settings.local.json 2>/dev/null || true)
 
   if [ -z "$settings" ]; then
-    echo "no .claude/settings.json — every tool call in a print-mode run will be denied." >&2
-    echo "grant at least: \"Bash(gh:*)\", \"Bash(git:*)\", and the project's own commands." >&2
+    warn "no .claude/settings.json — every tool call in a print-mode run will be denied."
+    warn "grant at least: \"Bash(gh:*)\", \"Bash(git:*)\", and the project's own commands."
     exit 1
   fi
 
   # `Bash(gh :*)` — a space before the colon — parses, matches nothing, and fails
   # exactly like a missing rule. Worth naming, because it is invisible by eye.
   if grep -qE '"Bash\([^)"]* :\*\)"' $settings; then
-    echo "a permission rule has a space before its colon, so it matches nothing:" >&2
+    warn "a permission rule has a space before its colon, so it matches nothing:"
     grep -nE '"Bash\([^)"]* :\*\)"' $settings >&2
-    echo "write it as Bash(gh:*), not Bash(gh :*)." >&2
+    warn "write it as Bash(gh:*), not Bash(gh :*)."
     exit 1
   fi
 
   for needs in gh git; do
     grep -qE "\"Bash\"|\"Bash\($needs:" $settings || {
-      echo "$settings does not grant $needs — a run will be denied and do nothing." >&2
-      echo "add \"Bash($needs:*)\" to permissions.allow." >&2
+      warn "$settings does not grant $needs — a run will be denied and do nothing."
+      warn "add \"Bash($needs:*)\" to permissions.allow."
       exit 1
     }
   done
@@ -76,12 +85,12 @@ held() { [ -f "$LOCK/pid" ] && kill -0 "$(cat "$LOCK/pid" 2>/dev/null)" 2>/dev/n
 
 if ! mkdir "$LOCK" 2>/dev/null; then
   if held; then
-    echo "another loop holds $LOCK (pid $(cat "$LOCK/pid"))" >&2
+    warn "another loop holds $LOCK (pid $(cat "$LOCK/pid"))"
     exit 1
   fi
-  echo "clearing a lock left by pid $(cat "$LOCK/pid" 2>/dev/null || echo '?')" >&2
+  warn "clearing a lock left by pid $(cat "$LOCK/pid" 2>/dev/null || echo '?')"
   rm -rf "$LOCK"
-  mkdir "$LOCK" 2>/dev/null || { echo "lost the race for $LOCK" >&2; exit 1; }
+  mkdir "$LOCK" 2>/dev/null || { warn "lost the race for $LOCK"; exit 1; }
 fi
 echo $$ >"$LOCK/pid"
 trap 'rm -rf "$LOCK"' EXIT INT TERM
@@ -95,7 +104,7 @@ if command -v timeout >/dev/null 2>&1; then
 elif command -v gtimeout >/dev/null 2>&1; then
   CAP=(gtimeout "$TIMEOUT")
 else
-  echo "no timeout(1) on PATH — a wedged run will not be cut off" >&2
+  warn "no timeout(1) on PATH — a wedged run will not be cut off"
 fi
 
 # The oldest open issue with $1 that no run has already claimed.
@@ -116,7 +125,10 @@ narrate() {
     return 0
   fi
   python3 -c '
-import sys, json
+import sys, json, time
+
+def now():
+    return time.strftime("%H:%M:%S")
 
 def short(v):
     return " ".join(str(v).split())[:96]
@@ -133,18 +145,18 @@ for line in sys.stdin:
                 if block.get("type") == "tool_use":
                     args = block.get("input", {}) or {}
                     detail = args.get("command") or args.get("file_path") or args.get("pattern") or ""
-                    print("   .", block.get("name"), short(detail), flush=True)
+                    print(now(), "  .", block.get("name"), short(detail), flush=True)
                 elif block.get("type") == "text" and block.get("text", "").strip():
-                    print("    ", short(block["text"]), flush=True)
+                    print(now(), "   ", short(block["text"]), flush=True)
         elif kind == "result":
-            print("   =", event.get("subtype"), str(event.get("num_turns")), "turns",
+            print(now(), "  =", event.get("subtype"), str(event.get("num_turns")), "turns",
                   "$" + str(round(event.get("total_cost_usd") or 0, 2)), flush=True)
     except Exception:
         continue
 ' 2>/dev/null || cat >/dev/null
 }
 
-echo "watching $REPO — build before approved, ${IDLE}s when idle"
+say "watching $REPO — build before approved, ${IDLE}s when idle"
 
 while :; do
   # Finish before starting: the build queue outranks the spec queue.
@@ -157,7 +169,12 @@ while :; do
   fi
 
   log="$LOGS/$(date +%Y%m%d-%H%M%S)-issue-$issue.json"
-  echo "issue #$issue — starting, logging to $log"
+  began=$(date +%s)
+  elapsed() {
+    local s=$(($(date +%s) - began))
+    printf '%dm%02ds' $((s / 60)) $((s % 60))
+  }
+  say "issue #$issue — starting, logging to $log"
 
   # The command works out which stage this is; the poll above only decides
   # whether it is worth waking anything at all.
@@ -173,7 +190,7 @@ while :; do
     # forever. Judge the run by whether the queue moved, not by its exit code.
     if [ "$(gh issue view "$issue" --repo "$REPO" --json labels \
       --jq 'any(.labels[].name; . == "approved" or . == "build")')" = "true" ]; then
-      echo "issue #$issue — exited clean but the label never moved; blocking it" >&2
+      warn "issue #$issue — exited clean but the label never moved; blocking it"
       gh issue edit "$issue" --repo "$REPO" \
         --remove-label approved --remove-label build \
         --add-label agent:blocked >/dev/null 2>&1 || true
@@ -181,12 +198,12 @@ while :; do
         --body "A run finished without claiming this — usually a tool it was not permitted to use. Log: \`$log\` (newline-delimited events; the last line holds \`permission_denials\`)." \
         >/dev/null 2>&1 || true
     else
-      echo "issue #$issue — finished"
+      say "issue #$issue — finished in $(elapsed)"
     fi
 
   else
     rc=$?
-    echo "issue #$issue — run exited $rc, see $log" >&2
+    warn "issue #$issue — run exited $rc after $(elapsed), see $log"
 
     # Hand the issue back from out here too. A run killed by the timeout never
     # reaches its own failure path, and a claim label nothing clears is worse
