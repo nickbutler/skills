@@ -153,6 +153,10 @@ gh issue list …          # free, so poll as often as you like
 claude -p "/work" …      # only when there is work; exits by itself when done
 ```
 
+The narrator is a view, not the record: `tee` writes every event to the log
+untouched, and the line on screen is trimmed to the terminal with an ellipsis so
+a cut is visible as a cut. Never let the readable version be the only version.
+
 Stream it. `--output-format json` prints nothing until the run ends, which for an
 implementation is eight silent minutes and no way to tell working from wedged.
 `--output-format stream-json --verbose` emits an event per step; `tee` it to the

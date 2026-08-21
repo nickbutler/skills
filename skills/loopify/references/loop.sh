@@ -125,13 +125,21 @@ narrate() {
     return 0
   fi
   python3 -c '
-import sys, json, time
+import sys, json, time, os, shutil
+
+# Fits the terminal, less the room the stamp and marker take. Falls back to a
+# sane width when stdout is a pipe, which is what launchd gives it. The log has
+# the whole event either way — this is the readable view, not the record.
+WIDTH = int(os.environ.get("NARRATE_WIDTH") or 0) or max(
+    40, shutil.get_terminal_size((120, 24)).columns - 24
+)
 
 def now():
     return time.strftime("%H:%M:%S")
 
 def short(v):
-    return " ".join(str(v).split())[:96]
+    text = " ".join(str(v).split())
+    return text if len(text) <= WIDTH else text[: WIDTH - 1] + "\u2026"
 
 for line in sys.stdin:
     try:
