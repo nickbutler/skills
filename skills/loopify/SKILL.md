@@ -163,10 +163,16 @@ It must not retry a failed run. The command labels the issue `agent:blocked` on
 its way out, which takes it off the queue until a human puts it back; a retrying
 loop spends the same tokens on the same failure all night.
 
-**Permissions are the part that bites.** In print mode there is nobody to answer a
-prompt, so anything not granted in advance simply does not run, and the failure
-looks like an agent that inexplicably would not use git. Grant what the work needs
-in the project's settings, where it is version-controlled and reviewable:
+**Permissions are the part that bites, and you cannot write them yourself.** In
+print mode there is nobody to answer a prompt, so anything not granted in advance
+simply does not run, and the failure looks like an agent that inexplicably would
+not use git.
+
+The settings file is what grants those permissions, so an agent is refused when it
+tries to write one — by `Write` and by a shell heredoc alike. That is the right
+refusal and it will not be talked round. Do not spend turns discovering it: print
+the file for the user to create, tell them where it goes, and carry on with
+everything else.
 
 ```jsonc
 // .claude/settings.json
@@ -240,6 +246,14 @@ outlives it — and a queue that skips claimed work will idle past that issue
 forever without mentioning it. The runner must hand the issue back from outside
 the agent as well as inside it. Belt and braces, because the braces are the ones
 that break.
+
+**Do not assume GNU tools on a mac.** `flock` does not exist there at all, and
+`timeout` is either missing or called `gtimeout` under homebrew. A runner written
+against them looks portable and is not — and the obvious macOS substitute for
+`flock`, `shlock`, will not reclaim a lock left by a killed process, so one
+`kill -9` wedges the queue until a human deletes a file. Lock with `mkdir`, which
+is atomic everywhere, and keep the holder's pid inside it so the next run can ask
+whether it is still alive.
 
 **A fresh worktree has no installed dependencies.** The check command fails in a
 way that reads like a broken suite rather than a missing install. Install inside

@@ -31,13 +31,40 @@ LOGS="${LOGS:-.agent/logs}"
 
 mkdir -p "$LOGS"
 
-# One loop per repository. Two loops on one queue is double spend, and the
-# label claim only protects against a race it can see.
-exec 9>"$LOGS/.lock"
-flock -n 9 || {
-  echo "another loop already holds $LOGS/.lock" >&2
-  exit 1
-}
+# One loop per repository: two loops on one queue is double spend, and the label
+# claim only protects against a race it can see.
+#
+# `mkdir` rather than flock, which macOS does not ship, or shlock, which does not
+# reclaim a lock left by a killed process. A directory is created atomically on
+# every POSIX system, and the pid inside it says whether the holder is still
+# alive — so a `kill -9` costs the next run one liveness check, not a wedged
+# queue and a hand-deleted file.
+LOCK="$LOGS/.lock"
+held() { [ -f "$LOCK/pid" ] && kill -0 "$(cat "$LOCK/pid" 2>/dev/null)" 2>/dev/null; }
+
+if ! mkdir "$LOCK" 2>/dev/null; then
+  if held; then
+    echo "another loop holds $LOCK (pid $(cat "$LOCK/pid"))" >&2
+    exit 1
+  fi
+  echo "clearing a lock left by pid $(cat "$LOCK/pid" 2>/dev/null || echo '?')" >&2
+  rm -rf "$LOCK"
+  mkdir "$LOCK" 2>/dev/null || { echo "lost the race for $LOCK" >&2; exit 1; }
+fi
+echo $$ >"$LOCK/pid"
+trap 'rm -rf "$LOCK"' EXIT INT TERM
+
+# `timeout` is GNU, so it is missing on a stock mac and named `gtimeout` under
+# homebrew coreutils. A missing one is not fatal — it only means a wedged run
+# blocks the queue until someone notices — but it must be said out loud.
+CAP=()
+if command -v timeout >/dev/null 2>&1; then
+  CAP=(timeout "$TIMEOUT")
+elif command -v gtimeout >/dev/null 2>&1; then
+  CAP=(gtimeout "$TIMEOUT")
+else
+  echo "no timeout(1) on PATH — a wedged run will not be cut off" >&2
+fi
 
 # The oldest open issue with $1 that no run has already claimed.
 queue() {
@@ -63,7 +90,7 @@ while :; do
 
   # The command works out which stage this is; the poll above only decides
   # whether it is worth waking anything at all.
-  if timeout "$TIMEOUT" claude -p "/work" \
+  if "${CAP[@]}" claude -p "/work" \
     --permission-mode acceptEdits \
     --output-format json >"$log"; then
 
