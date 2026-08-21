@@ -159,6 +159,11 @@ alive between runs, nothing accumulates context, and a wedged run cannot poison
 the next one. The script it lands in should still wrap the call in `timeout`, and
 hold a `flock` so two copies cannot watch one queue.
 
+It should also preflight the permissions before the first tick — the file exists,
+no rule has a space before its colon, and `gh` and `git` are granted — and refuse
+to start otherwise. All three failures are free to catch at startup and cost a
+whole run to discover, and the third one costs it silently.
+
 It must not retry a failed run. The command labels the issue `agent:blocked` on
 its way out, which takes it off the queue until a human puts it back; a retrying
 loop spends the same tokens on the same failure all night.

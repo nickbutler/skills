@@ -31,6 +31,38 @@ LOGS="${LOGS:-.agent/logs}"
 
 mkdir -p "$LOGS"
 
+# Preflight the permissions before the first tick. A non-interactive run cannot be
+# granted anything at a prompt, so a missing or malformed rule does not ask — it
+# denies, the run exits clean having done nothing, and the queue check has to
+# rescue the issue. All of that is avoidable here, at no cost, before anything
+# starts. Set SKIP_PREFLIGHT=1 if the grants live somewhere this cannot see.
+if [ -z "${SKIP_PREFLIGHT:-}" ]; then
+  settings=$(ls .claude/settings.json .claude/settings.local.json 2>/dev/null || true)
+
+  if [ -z "$settings" ]; then
+    echo "no .claude/settings.json — every tool call in a print-mode run will be denied." >&2
+    echo "grant at least: \"Bash(gh:*)\", \"Bash(git:*)\", and the project's own commands." >&2
+    exit 1
+  fi
+
+  # `Bash(gh :*)` — a space before the colon — parses, matches nothing, and fails
+  # exactly like a missing rule. Worth naming, because it is invisible by eye.
+  if grep -qE '"Bash\([^)"]* :\*\)"' $settings; then
+    echo "a permission rule has a space before its colon, so it matches nothing:" >&2
+    grep -nE '"Bash\([^)"]* :\*\)"' $settings >&2
+    echo "write it as Bash(gh:*), not Bash(gh :*)." >&2
+    exit 1
+  fi
+
+  for needs in gh git; do
+    grep -qE "\"Bash\"|\"Bash\($needs:" $settings || {
+      echo "$settings does not grant $needs — a run will be denied and do nothing." >&2
+      echo "add \"Bash($needs:*)\" to permissions.allow." >&2
+      exit 1
+    }
+  done
+fi
+
 # One loop per repository: two loops on one queue is double spend, and the label
 # claim only protects against a race it can see.
 #
