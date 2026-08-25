@@ -1,0 +1,42 @@
+# Change: <Name>
+
+**Status**: proposed
+
+## Why
+
+<1-3 sentences: the problem or opportunity. Not the solution — the reason anyone should care. If this came from a bug, an incident, or a user request, say so and link it.>
+
+## Scope
+
+**In**: <what this change covers>
+
+**Out**: <what it deliberately does not cover — the boundary that stops this change growing>
+
+## Features touched
+
+<One line per feature, with the kind of change. Link the feature file; do not restate its requirements here — the feature file is the requirement, this is only the manifest.>
+
+- [<feature-slug>](../features/<feature-slug>.md) — added
+- [<feature-slug>](../features/<feature-slug>.md) — modified: <one line on what changed behaviourally>
+- [<feature-slug>](../features/<feature-slug>.md) — removed: <why>
+
+## Decisions
+
+<Architectural choices this change makes get ADR records, not prose here. Link them.>
+
+- [<YYYY-MM-DD>-<decision-slug>](../ADR/<YYYY-MM-DD>-<decision-slug>.md) — <one line>
+
+<Delete this section if the change makes no architectural choice.>
+
+## Tasks
+
+<Derived from the spec delta, not invented. Each task is a unit a reviewer could verify independently. Group with a heading when there are more than about eight.>
+
+- [ ] 1.1 <task>
+- [ ] 1.2 <task>
+- [ ] 2.1 <task>
+
+## Review
+
+Spec delta: `git diff main...HEAD -- specs/`
+Structure:  `validate.sh specs`

@@ -22,7 +22,7 @@ Or clone and symlink the ones you want into `~/.agents/skills/`.
 | `diagnosing-bugs` | No fix without root cause: build a red-capable feedback loop, rank falsifiable hypotheses, fix via failing test. |
 | `loopify` | Sets up an agent loop that turns labelled issues into reviewed pull requests — label ladder, queue command, worktree isolation, PR gate. |
 | `scrollytelling` | Builds a public "How it works" scrollytelling page inside an app — narrative chapters, scroll-driven animation, content-contract test. |
-| `spec` | Maintains a `specs/` folder of features with Gherkin BDD acceptance criteria; creates, infers from code, or reconciles drift. |
+| `spec` | Maintains a `specs/` folder of features with Gherkin BDD acceptance criteria; creates, infers from code, proposes reviewable changes, or reconciles drift — with a deterministic structure validator. |
 | `web-deck` | Builds a presentation as a bespoke single-file web app — stepped scrollytelling canvas, markdown content layer, print-to-PDF. |
 
 ## Layout
@@ -31,6 +31,7 @@ Or clone and symlink the ones you want into `~/.agents/skills/`.
 skills/<name>/SKILL.md        # required — YAML frontmatter (name, description) + instructions
 skills/<name>/references/     # optional — templates and reference material
 skills/<name>/*.sh            # optional — scripts the skill runs
+skills/<name>/*.test.sh       # optional — tests for those scripts, not shipped guidance
 ```
 
 One skill per directory, named the same as its `name:` frontmatter field. That layout is what

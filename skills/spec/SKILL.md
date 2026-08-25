@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Use when the user wants to spec out what to build, document an existing system as specs or user stories, or reconcile specs that have drifted from code. Triggers include "spec out", "let's plan what we're building", "document what we have", "create a specs folder", "sync the specs", "what's drifted", or an explicit /spec create|infer|update. Maintains a specs/ folder of features with Gherkin BDD acceptance criteria; mode is auto-detected when not named.
+description: Use when the user wants to spec out what to build, propose a change to an already-specced system, document an existing system as specs or user stories, or reconcile specs that have drifted from code. Triggers include "spec out", "let's plan what we're building", "spec this change", "what would it take to add X", "document what we have", "create a specs folder", "sync the specs", "what's drifted", or an explicit /spec create|infer|change|update. Maintains a specs/ folder of features with Gherkin BDD acceptance criteria, validated structurally by validate.sh; mode is auto-detected when not named.
 ---
 
 # Spec
@@ -13,13 +13,17 @@ Generate and maintain a structured spec set: a flat list of feature files with G
 |---|---|
 | `/spec create` | No code yet — design a spec from a conversation or planning discussion |
 | `/spec infer` | Code exists, no `specs/` folder — reverse-engineer specs from the codebase |
-| `/spec update` | `specs/` folder exists — reconcile specs with code changes |
+| `/spec change` | `specs/` folder exists — propose a specific change to build, as a reviewable spec delta plus tasks |
+| `/spec update` | `specs/` folder exists — reconcile specs with code that has already changed |
 
 **Auto-detect when no mode is given:**
-1. `specs/` folder exists → **update**
+1. No `specs/`, no codebase → **create**
 2. No `specs/`, but a codebase exists → **infer**
-3. No `specs/`, no codebase → **create**
-4. Ambiguous (e.g. `specs/` exists but user says "start fresh") → ask
+3. `specs/` exists, and the user is proposing new work ("add", "build", "change", "what would it take to…") → **change**
+4. `specs/` exists, and the user is reconciling with code already written ("sync", "what's drifted", "we've been building") → **update**
+5. Ambiguous (e.g. `specs/` exists but user says "start fresh") → ask
+
+**change vs update** is the distinction to get right: **change** runs *before* the code, and the spec delta is the thing being agreed; **update** runs *after* the code, and the spec is catching up to reality. If code has already been written for the work in question, it is an update, not a change.
 
 ---
 
@@ -38,7 +42,11 @@ specs/
 ├── features/
 │   ├── <feature-slug>.md             # user story, context, technical notes, status
 │   └── <feature-slug>.feature        # executable Gherkin (pytest-bdd / Cucumber)
-└── archived/                         # [update mode] deprecated features
+├── changes/                          # [change mode] in-flight work
+│   ├── <change-slug>.md              # why, scope, features touched, tasks
+│   └── archive/
+│       └── <YYYY-MM-DD>-<change-slug>.md
+└── archived/                         # [update/change mode] deprecated features
     ├── <feature-slug>.md
     └── <feature-slug>.feature
 ```
@@ -48,6 +56,8 @@ specs/
 **`DATA_MODEL.md`** is optional — create it when the project has persistent or structured data worth specifying. It holds the concrete detail: entity definitions, field names, types, validation rules, and persistence notes. `ARCHITECTURE.md` keeps the conceptual domain overview; `DATA_MODEL.md` is where an implementer goes to understand the actual shape of the data.
 
 **`ADR/`** is the decision log: *why* the architecture looks the way it does. One record per file, named `<YYYY-MM-DD>-<decision-slug>.md` (date decided; date raised for open questions) so records sort chronologically. Each record captures the decision made, the alternatives considered, and the constraints that drove the choice; unresolved questions are records with status `open`. Rejected approaches get records too (status `rejected`) — negative memory, so future sessions don't re-propose them. Consult existing records, including rejected ones, before proposing any architectural change. `ADR/INDEX.md` lists every record with status and a one-line description, like the main `INDEX.md`. Records are append-only — revise by adding a new record that supersedes the old one, not by rewriting it. Keep `ADR/INDEX.md` in sync whenever records are added or their status changes.
+
+**`changes/`** holds one file per in-flight change. A change file records *why* work is being done, what it touches, and the task list — never the requirements themselves. The requirements live in `features/`, edited in place on a branch; the delta is `git diff specs/`. Keeping requirement text out of the change file is the whole point: a second copy of a requirement is a second thing that can drift. Completed changes move to `changes/archive/<YYYY-MM-DD>-<change-slug>.md`.
 
 Each feature is a pair of files with the same slug. The `.md` carries the human-readable context; the `.feature` carries the executable Gherkin. They are always created and archived together.
 
@@ -59,7 +69,7 @@ Use `kebab-case` slugs derived from names, not numbers.
 
 **Existing step library is canonical.** When `step_definitions/` exists, use its steps verbatim. Never modify the step library directly. When a scenario requires a step that doesn't exist, write the natural Gherkin phrase and tag the scenario `@draft` — a signal that the step needs implementing before the scenario can run.
 
-**No invention.** Never add behaviour, features, or requirements that weren't confirmed (infer/update) or explicitly discussed (create). Speculation goes to `GAPS.md` or an open `ADR/` record.
+**No invention.** Never add behaviour, features, or requirements that weren't confirmed (infer/update) or explicitly discussed (create/change). Speculation goes to `GAPS.md` or an open `ADR/` record.
 
 ## Shared: step definitions handling
 
@@ -170,11 +180,37 @@ Each feature file carries a `**Status**:` line below its title. Statuses flow in
 
 **INDEX.md** maintains a features table with a Status column — the single place to see all features and their status at a glance. `deferred` features are excluded from progress counts.
 
+Change files carry their own `**Status**:` — `proposed` (written, not yet agreed), `in progress` (tasks agreed, being built), `complete` (archived). These are the change's lifecycle, not a feature's.
+
 **Updating statuses:**
 - `create` and `infer` modes: all new features start at `draft`
+- `change` mode: features the change touches move to `ready` when the delta is agreed, then track implementation as it lands
 - `update` mode: when code evidence confirms a feature is implemented and tests are present, propose advancing to `in progress` or `passing`; when referenced code disappears, flag as `failing` and prompt the user
 - Status changes outside `update` mode are manual — the user edits the feature file and INDEX.md directly
 - After any status change, recalculate the INDEX.md progress counts
+
+## Shared: validation
+
+`validate.sh` ships with this skill (same directory). It checks the structural invariants of a spec set deterministically — no model in the loop, so it cannot be talked into a pass.
+
+```sh
+validate.sh [specs-dir]     # default: ./specs — exits non-zero on any FAIL
+```
+
+It checks:
+
+- every `features/*.md` has a matching `.feature`, and vice versa
+- every feature `.md` carries a valid `**Status**:` (a trailing note after the status token is allowed; `archived` is a status only inside `archived/`)
+- `INDEX.md` lists exactly the features on disk, with matching statuses — the single most common drift
+- each `.feature` has a `Feature:` line, at least one scenario, and no scenario without steps
+- every non-blank line inside a scenario is a Gherkin step (typos like `Whne` are caught; narrative blocks, tables, docstrings and comments are not)
+- every step resolves against `step_definitions/` unless its scenario is tagged `@draft` — a `Background` cannot carry a tag, so it is exempt only when every scenario in the file is `@draft`. Skipped entirely when no step library exists.
+- `ADR/` filenames are dated, and `ADR/INDEX.md` lists exactly the records on disk
+- each `changes/*.md` has a task checklist and links only to features that exist; an archived change has no open tasks
+
+**Run it at the end of every mode, before reporting.** A `FAIL` is a real inconsistency in the spec set — fix the spec, never loosen the check. The summary line (feature counts by status, `@draft` scenario count) is the raw material for the report, so read its output rather than recounting by hand.
+
+What it deliberately does not check: whether a scenario is *correct*, whether a feature is worth having, or whether the spec matches the code. Those need judgement — that is what the modes and their checkpoints are for.
 
 ## Shared: templates
 
@@ -189,6 +225,7 @@ All templates are in `references/templates/`. Read each one just-in-time — onl
 | `adr-index.md.template` | all modes |
 | `feature.md.template` | all modes — human-readable context |
 | `feature.feature.template` | all modes — executable Gherkin |
+| `change.md.template` | change mode |
 | `gaps.md.template` | all modes |
 | `sync-report.md.template` | update mode |
 
@@ -297,7 +334,7 @@ Generate one feature file in full, with these adaptations:
 
 #### 5. Remaining features → Finalise → Report
 
-Generate remaining features. Complete `INDEX.md`. Populate `ARCHITECTURE.md` with the cross-cutting design that emerged from the discussion — key abstractions, module boundaries, and the structural choices that span multiple features. Write an `ADR/` record for each choice and open question from the session and complete `ADR/INDEX.md`. Report: file tree, domain vocabulary established, count of open decisions, count of spec gaps, count of `@draft` scenarios needing step implementation, recommended next step.
+Generate remaining features. Complete `INDEX.md`. Run `validate.sh specs` and fix what it flags. Populate `ARCHITECTURE.md` with the cross-cutting design that emerged from the discussion — key abstractions, module boundaries, and the structural choices that span multiple features. Write an `ADR/` record for each choice and open question from the session and complete `ADR/INDEX.md`. Report: file tree, domain vocabulary established, count of open decisions, count of spec gaps, count of `@draft` scenarios needing step implementation, recommended next step.
 
 ---
 
@@ -372,7 +409,107 @@ Generate one feature file in full. Apply the confirmed-only rule strictly. Tag a
 
 #### 4. Remaining features → Finalise → Report
 
-Generate remaining features. Complete `INDEX.md`. Populate `ARCHITECTURE.md` by synthesising from the codebase: key abstractions, module structure, system boundaries, and the major structural patterns observed. Write `ADR/` records for any structural choices that are visible in the code but whose rationale is not self-evident — status `accepted`, with the evidence as context — and complete `ADR/INDEX.md`. Report: file tree, what's covered and what's in GAPS, count of `@draft` scenarios needing step implementation, patterns or inconsistencies noticed (flag, do not fix).
+Generate remaining features. Complete `INDEX.md`. Run `validate.sh specs` and fix what it flags. Populate `ARCHITECTURE.md` by synthesising from the codebase: key abstractions, module structure, system boundaries, and the major structural patterns observed. Write `ADR/` records for any structural choices that are visible in the code but whose rationale is not self-evident — status `accepted`, with the evidence as context — and complete `ADR/INDEX.md`. Report: file tree, what's covered and what's in GAPS, count of `@draft` scenarios needing step implementation, patterns or inconsistencies noticed (flag, do not fix).
+
+---
+
+## Mode: change
+
+Propose a specific piece of work against an existing spec set, as a reviewable delta plus an implementation checklist. Specs here are **prescriptive** — like create mode, but bounded by a system that already exists.
+
+### When to use
+
+- A `specs/` folder exists and the user wants to build something new or alter existing behaviour
+- The question is "what would it take to add X" and the answer should be reviewable before code
+- A change spans several features and needs its scope agreed in one place
+
+### When NOT to use
+
+- No `specs/` folder → **create** or **infer** first; there is nothing to delta against
+- The code has already been written → **update**; the spec is catching up, not leading
+- A one-line correction to a spec that is simply wrong → just edit it, no change file
+
+### Additional principles
+
+**The feature files are the delta.** Edit `features/` in place on a branch. Never restate a requirement in the change file — it is a manifest, not a spec. Two copies of a requirement is exactly the drift this skill exists to prevent.
+
+**One change, one branch, one file.** If the work needs two independent reviews, it is two changes. A change file that touches half the feature set is a roadmap, not a change — split it.
+
+**Scope is a boundary, not a wish list.** The `Out` section is load-bearing. Anything discovered mid-change that falls outside it goes to `GAPS.md` or a follow-up change, not into this one.
+
+**Decisions become ADRs, not prose.** An architectural choice made during a change gets an `ADR/` record, linked from the change file. Consult existing records — including `rejected` ones — before proposing an approach, and record a new rejection when one is turned down. The change file archives; the ADR does not.
+
+**Tasks derive from the spec delta.** Each task traces to something the diff changed. If a task has no corresponding spec change, either the spec is incomplete or the task is scope creep — find out which.
+
+### Workflow
+
+#### 1. Locate
+
+Read `INDEX.md`, then `ARCHITECTURE.md`, `ADR/INDEX.md` (and any record that looks relevant, including rejected ones), and the feature files the change plausibly touches. Identify:
+
+- which existing features change behaviour, and how
+- which features are new
+- whether anything becomes obsolete
+- which existing decisions constrain the approach, and whether this change contradicts one
+
+Create the branch. Everything from here is reviewable as a diff.
+
+Report the affected-feature list and any decision that constrains the approach.
+
+**Stop. Confirm the blast radius before writing anything.**
+
+#### 2. Proposal
+
+Write `specs/changes/<change-slug>.md` from `references/templates/change.md.template` — Why, Scope (in *and* out), Features touched, Decisions. **Leave Tasks empty**; tasks derive from the spec delta and the delta does not exist yet.
+
+Where the change makes an architectural choice, write the `ADR/` record now and link it. Where the choice is genuinely open, write the record with status `open` and say in the change file that the delta depends on it.
+
+**Stop. Agree why and how big before touching a single feature file.**
+
+#### 3. Spec delta
+
+Edit `features/` in place:
+
+- **Modified features**: change the scenarios that change behaviour. Leave untouched scenarios alone — a scenario that still holds should not show up in the diff. Update Technical notes only where they are now wrong.
+- **New features**: full `.md` + `.feature` pair from the templates, status `ready`. Add to `INDEX.md`.
+- **Removed features**: move the pair to `archived/` with a deprecation header naming this change. Remove the `INDEX.md` row.
+
+Tag `@draft` on any scenario needing a step that doesn't exist yet — the same rule as every other mode.
+
+Set status to `ready` on everything the change touches, and run `validate.sh specs`.
+
+**Stop. The user reviews the delta with `git diff specs/`. This is the review that matters — the whole point of the mode is that it happens before implementation.**
+
+#### 4. Tasks
+
+Derive the implementation checklist from the delta. Each task is a unit a reviewer could verify on its own; number them `<group>.<n>`. Order them so the suite can go green in stages rather than all at the end.
+
+Where the project follows TDD, the scenarios *are* the failing tests — task 1 is normally implementing the `@draft` steps so they can run red.
+
+Write them into the change file, set its status to `in progress`, and re-run `validate.sh specs`.
+
+**Stop. Confirm the task list before implementing.**
+
+#### 5. Implement
+
+Implementation may happen in this session or elsewhere. Whoever does it:
+
+- ticks tasks as they land
+- moves touched features `ready` → `in progress` → `passing` as their scenarios go green, keeping `INDEX.md` in step
+- removes `@draft` tags as the steps behind them are implemented
+
+Do not tick a task or advance a status on the strength of code that has not been run. `passing` means the scenarios were executed and were green.
+
+#### 6. Archive
+
+When every task is ticked and every touched feature's scenarios are green:
+
+- move the change file to `changes/archive/<YYYY-MM-DD>-<change-slug>.md`, status `complete` (date completed)
+- confirm every touched feature is `passing` (or `deferred`, with a note), and `INDEX.md` agrees
+- recalculate the `INDEX.md` progress counts
+- run `validate.sh specs` — it will fail if the archived change still has an open task, or if `INDEX.md` has fallen out of step
+
+Report: features added / modified / archived, `@draft` scenarios still outstanding, ADR records written, and the `validate.sh` summary line.
 
 ---
 
@@ -444,10 +581,11 @@ In order:
 - `DATA_MODEL.md`: update when entities are added, removed, or their fields/types change; if `DATA_MODEL.md` doesn't exist but the codebase now has meaningful persistent data, propose creating it
 - `ADR/`: add new records for structural choices made since the last sync; never rewrite existing records; keep `ADR/INDEX.md` in sync. If the spec set has a legacy `DESIGN_DECISIONS.md`, propose migrating it: split each entry into its own `ADR/` record (dated from the entry where possible, otherwise from git history), build `ADR/INDEX.md`, and delete the old file
 - `GAPS.md`: open and newly-discovered gaps only
+- `changes/`: for each in-flight change, tick tasks the code shows are done; if every task is complete and the scenarios are green, propose archiving it. A change whose features have all drifted away from it is stale — surface it, don't quietly delete it
 
 ### Finalise
 
-Write `specs/SYNC_REPORT.md` using `references/templates/sync-report.md.template`.
+Run `validate.sh specs` and fix anything it flags. Write `specs/SYNC_REPORT.md` using `references/templates/sync-report.md.template`.
 
 Report: total files changed, clarifications requested and resolved, items deferred, pointer to `SYNC_REPORT.md`, suggestion to review via `git diff specs/`.
 
@@ -464,4 +602,5 @@ Bundle clarification questions when possible. Ask (don't guess) when:
 
 - **"Generate all features in one pass"** — after confirming the feature list, generate all features without stopping between them; still stop after the first feature for format review
 - **"Include inferred behaviour, tag inline"** — (infer/update) switch to Confirmed/Inferred/Gap inline tagging instead of separate GAPS.md
+- **"No change file"** — (change) apply the spec delta on a branch without writing `changes/<slug>.md`; the diff is the whole record. Loses the why and the task list — only for a change small enough to review in one sitting
 - **"Skip step definition verification"** — write idiomatic Gherkin without checking against the library; still record proposed steps
