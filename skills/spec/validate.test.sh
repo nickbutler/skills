@@ -182,6 +182,14 @@ archived_status_ok()   { mk_archived "$1" "archived (was draft)"; }
 archived_live_status() { mk_archived "$1" "passing"; }
 live_archived_status() { sed -i.bak 's/\*\*Status\*\*: draft/**Status**: archived/' "$1/specs/features/login.md"; }
 
+# a description cell may itself contain a pipe (inline code, alternatives)
+piped_desc() {
+  sed -i.bak 's/| draft | Signing in |/| draft | `mode: sso | password` per tenant |/' "$1/specs/INDEX.md"
+}
+piped_adr_desc() {
+  sed -i.bak 's/| accepted | Storage choice |/| accepted | `sqlite | postgres` — sqlite wins |/' "$1/specs/ADR/INDEX.md"
+}
+
 # --- ADR -------------------------------------------------------------------
 adr_orphan_file() { printf '# Use Redis\n\n**Status**: accepted\n' > "$1/specs/ADR/2026-02-02-use-redis.md"; }
 adr_phantom_row() { printf '| [2026-03-03-use-kafka](2026-03-03-use-kafka.md) | accepted | Queues |\n' >> "$1/specs/ADR/INDEX.md"; }
@@ -235,6 +243,8 @@ check "absent status still summarises"    1 "2 features"                mixed_st
 check "feature narrative allowed"         0 "ok"                        narrative
 check "docstring content allowed"         0 "ok"                        docstring_mermaid
 check "outline table and background ok"   0 "ok"                        outline_table
+check "pipe in INDEX description ok"      0 "ok"                        piped_desc
+check "pipe in ADR description ok"        0 "ok"                        piped_adr_desc
 check "annotated status passes"           0 "ok"                        annotated_status
 check "annotated status both sides ok"    0 "ok"                        annotated_index
 check "annotated unknown status fails"    1 "wibble"                     annotated_bad

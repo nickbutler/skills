@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Use when the user wants to spec out what to build, propose a change to an already-specced system, document an existing system as specs or user stories, or reconcile specs that have drifted from code. Triggers include "spec out", "let's plan what we're building", "spec this change", "what would it take to add X", "document what we have", "create a specs folder", "sync the specs", "what's drifted", or an explicit /spec create|infer|change|update. Maintains a specs/ folder of features with Gherkin BDD acceptance criteria, validated structurally by validate.sh; mode is auto-detected when not named.
+description: Use when the user wants to spec out what to build, propose a change to an already-specced system, document an existing system as specs or user stories, or reconcile specs that have drifted from code. Triggers include "spec out", "let's plan what we're building", "spec this change", "what would it take to add X", "document what we have", "create a specs folder", "sync the specs", "what's drifted", or an explicit /spec create|infer|change|update. Maintains a specs/ folder of features with Gherkin BDD acceptance criteria, checked by validate.sh and browsable via view.sh; mode is auto-detected when not named.
 ---
 
 # Spec
@@ -211,6 +211,27 @@ It checks:
 **Run it at the end of every mode, before reporting.** A `FAIL` is a real inconsistency in the spec set — fix the spec, never loosen the check. The summary line (feature counts by status, `@draft` scenario count) is the raw material for the report, so read its output rather than recounting by hand.
 
 What it deliberately does not check: whether a scenario is *correct*, whether a feature is worth having, or whether the spec matches the code. Those need judgement — that is what the modes and their checkpoints are for.
+
+## Shared: viewing
+
+`view.sh` ships with this skill. It serves the spec set as a browsable site and opens it.
+
+```sh
+view.sh [specs-dir] [--port N] [--no-open]     # default: ./specs, ctrl-c to stop
+```
+
+It is **read-only** — no write endpoints, no state, nothing touched in the working tree — so it is safe to leave running while you edit, rebase or switch branches. Refresh to see the current files; there is no build step and no cache.
+
+What it gives you that reading the files does not:
+
+- **The set at a glance** — every feature as a card with its status, description and scenario counts, over a progress bar of the whole set by status
+- **Gherkin rendered as Gherkin** — scenarios as cards, keywords coloured, `@draft` called out, outline `Examples:` and step tables as real tables
+- **Cross-links followed** — a feature shows the changes that touch it; links between spec files navigate in-app rather than downloading a `.md`
+- **Decisions by state** — accepted, rejected and open records are coloured apart, so an open question never reads as settled
+- **Git history per feature** — the commits that touched either half of the pair, and the diff for any of them. `#/feature/<slug>/<sha>` is a shareable link straight to one
+- **Validation inline** — the same findings `validate.sh` prints, with the failure count in the header
+
+Reach for it when reviewing a spec set you did not write, when a status looks wrong and you want the commit that changed it, or when showing the specs to someone who will not read a folder of markdown. It renders the spec set as it is — it will not tell you whether the specs are true.
 
 ## Shared: templates
 

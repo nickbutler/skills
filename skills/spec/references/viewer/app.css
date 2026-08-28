@@ -1,0 +1,153 @@
+:root {
+  --bg: #fbfbfa; --panel: #fff; --ink: #16161a; --dim: #6b6b76; --line: #e4e4e0;
+  --accent: #3b5bdb; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 12px rgba(0,0,0,.04);
+  --draft: #94a3b8; --ready: #3b82f6; --inprogress: #d97706; --passing: #15803d;
+  --failing: #dc2626; --deferred: #8b5cf6; --archived: #a1a1aa;
+  --add: #15803d; --addbg: #dcfce7; --del: #b91c1c; --delbg: #fee2e2;
+  --given: #0369a1; --when: #b45309; --then: #15803d;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1012; --panel: #17181c; --ink: #e8e8ea; --dim: #9b9ba6; --line: #2a2b31;
+    --accent: #7c9cff; --shadow: 0 1px 2px rgba(0,0,0,.4);
+    --draft: #64748b; --ready: #60a5fa; --inprogress: #f59e0b; --passing: #4ade80;
+    --failing: #f87171; --deferred: #a78bfa; --archived: #71717a;
+    --add: #4ade80; --addbg: #052e16; --del: #f87171; --delbg: #3f1212;
+    --given: #7dd3fc; --when: #fcd34d; --then: #86efac;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+code, pre, .gherkin, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* --- header --------------------------------------------------------------- */
+header {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 20px;
+  padding: 0 20px; height: 52px; background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 640; letter-spacing: -.01em; }
+.mark {
+  width: 11px; height: 11px; border-radius: 3px;
+  background: linear-gradient(135deg, var(--accent), var(--passing));
+}
+.progress { flex: 1; display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--line); max-width: 460px; }
+.progress span { display: block; }
+.health {
+  font-size: 12.5px; font-weight: 600; padding: 4px 11px; border-radius: 99px;
+  background: color-mix(in srgb, var(--passing) 14%, transparent); color: var(--passing);
+}
+.health.bad { background: color-mix(in srgb, var(--failing) 14%, transparent); color: var(--failing); }
+
+/* --- layout --------------------------------------------------------------- */
+#shell { display: grid; grid-template-columns: 268px 1fr; align-items: start; }
+#side {
+  position: sticky; top: 52px; height: calc(100vh - 52px); overflow-y: auto;
+  border-right: 1px solid var(--line); padding: 14px 10px 40px;
+}
+#filter {
+  width: 100%; padding: 7px 10px; margin-bottom: 12px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--panel); color: var(--ink); font-size: 13.5px;
+}
+#filter:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: -1px; }
+.group { margin-bottom: 18px; }
+.group h4 {
+  margin: 0 0 6px; padding: 0 8px; font-size: 11px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--dim); font-weight: 650;
+}
+.item {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px;
+  color: var(--ink); font-size: 13.5px; cursor: pointer;
+}
+.item:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); text-decoration: none; }
+.item.on { background: color-mix(in srgb, var(--accent) 15%, transparent); font-weight: 560; }
+.item .label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 7px; height: 7px; border-radius: 99px; flex: none; }
+.count {
+  font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums;
+  white-space: nowrap; flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis;
+}
+
+main { padding: 28px 34px 90px; max-width: 940px; }
+.loading { color: var(--dim); }
+h1 { font-size: 25px; margin: 0 0 4px; letter-spacing: -.02em; }
+h2 { font-size: 17px; margin: 30px 0 10px; letter-spacing: -.01em; }
+h3 { font-size: 14.5px; margin: 20px 0 6px; }
+.sub { color: var(--dim); margin: 0 0 18px; }
+
+/* --- pills and cards ------------------------------------------------------ */
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+  padding: 3px 10px; border-radius: 99px; background: color-mix(in srgb, currentColor 13%, transparent);
+}
+.tag { font-size: 11.5px; padding: 2px 7px; border-radius: 5px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--dim); }
+.tag.draft { background: color-mix(in srgb, var(--inprogress) 18%, transparent); color: var(--inprogress); }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+  padding: 15px 17px; margin-bottom: 12px; box-shadow: var(--shadow);
+}
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 11px; }
+.grid .card { margin: 0; cursor: pointer; }
+.grid .card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.card h3 { margin: 0 0 5px; }
+.meta { color: var(--dim); font-size: 12.5px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* --- gherkin -------------------------------------------------------------- */
+.scenario { border-left: 3px solid var(--line); padding-left: 14px; margin: 16px 0; }
+.scenario.is-draft { border-left-color: var(--inprogress); }
+.scenario .name { font-weight: 620; margin-bottom: 7px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.scenario .kw { color: var(--dim); font-weight: 500; font-size: 12.5px; }
+.steps { font-size: 13.5px; line-height: 1.9; }
+.step .k { display: inline-block; min-width: 46px; font-weight: 650; }
+.k.Given, .k.And, .k.But { color: var(--given); }
+.k.When { color: var(--when); }
+.k.Then { color: var(--then); }
+table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+th, td { border: 1px solid var(--line); padding: 4px 10px; text-align: left; }
+th { background: color-mix(in srgb, var(--ink) 4%, transparent); font-weight: 620; }
+pre {
+  background: color-mix(in srgb, var(--ink) 4%, transparent); padding: 11px 13px;
+  border-radius: 8px; overflow-x: auto; font-size: 12.5px; line-height: 1.55;
+}
+:not(pre) > code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+
+/* --- prose ---------------------------------------------------------------- */
+.prose > :first-child { margin-top: 0; }
+.prose ul, .prose ol { padding-left: 22px; }
+.prose li { margin: 3px 0; }
+.prose blockquote { margin: 10px 0; padding-left: 13px; border-left: 3px solid var(--line); color: var(--dim); }
+.prose hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
+
+/* --- history and diff ----------------------------------------------------- */
+.commit {
+  display: flex; gap: 12px; align-items: baseline; padding: 8px 11px; border-radius: 8px;
+  cursor: pointer; border: 1px solid transparent;
+}
+.commit:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.commit.on { border-color: var(--line); background: var(--panel); }
+.commit .sha { font-family: ui-monospace, monospace; font-size: 12px; color: var(--accent); }
+.commit .subject { flex: 1; }
+.commit .when { font-size: 12px; color: var(--dim); white-space: nowrap; }
+.diff { font-size: 12.5px; line-height: 1.5; }
+.diff div { padding: 0 10px; white-space: pre-wrap; word-break: break-word; }
+.diff .p { color: var(--add); background: var(--addbg); }
+.diff .m { color: var(--del); background: var(--delbg); }
+.diff .h { color: var(--dim); }
+
+/* --- tasks and problems --------------------------------------------------- */
+.task { display: flex; gap: 9px; align-items: baseline; padding: 3px 0; font-size: 13.5px; }
+.task .box { color: var(--dim); }
+.task.done { color: var(--dim); }
+.task.done .box { color: var(--passing); }
+.problem { border-left: 3px solid var(--failing); padding: 6px 12px; margin: 6px 0; font-size: 13.5px; }
+.empty { color: var(--dim); font-style: italic; }
+@media (max-width: 820px) {
+  #shell { grid-template-columns: 1fr; }
+  #side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  main { padding: 20px; }
+}
