@@ -50,6 +50,9 @@ EOF
 cat > specs/features/resolution.feature <<'EOF'
 Feature: Column resolution
 
+  Background:
+    Given a loaded schema
+
   @draft
   Scenario: Exact name match resolves silently
     Given a target column "amount"
@@ -140,6 +143,7 @@ check "step keywords classed"        '"k Given" in main and "k When" in main and
 check "draft scenario flagged"       '"is-draft" in main'
 check "examples table rendered"      '"<table>" in main and "verdict" in main'
 check "outline keyword shown"        '"Scenario Outline" in main'
+check "background named once"        'main.count("Background") == 1'
 
 # --- history ----------------------------------------------------------------
 check "history rendered"             '"Add specs" in main'
@@ -154,6 +158,18 @@ check "diff pane rendered"           '"class=\"diff\"" in main'
 check "added lines marked"           '"class=\"p\"" in main'
 check "selected commit highlighted"  '"commit on" in main'
 check "feature still rendered"       '"Exact name match" in main'
+
+# --- feature pair side by side ----------------------------------------------
+check "pair is split into columns"   '"class=\"split\"" in main'
+check "markdown is the left column"  're.search("col md.*?User story", main, re.S) is not None'
+check "gherkin is the right column"  're.search("col bdd.*?Exact name match", main, re.S) is not None'
+check "markdown precedes gherkin"    'main.find("col md") < main.find("col bdd")'
+check "history spans full width"     'main.find("col bdd") < main.find("History")'
+
+# --- headings are colour-coded by section -----------------------------------
+check "known section is classed"     '"sec-user-story" in main'
+check "second section is classed"    '"sec-technical-notes" in main'
+check "every heading gets sec"       'main.count("class=\"sec") >= 3'
 
 # --- the sidebar ------------------------------------------------------------
 side="$tmp/side.html"

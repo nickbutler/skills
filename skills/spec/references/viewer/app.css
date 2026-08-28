@@ -73,11 +73,46 @@ header {
   white-space: nowrap; flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis;
 }
 
-main { padding: 28px 34px 90px; max-width: 940px; }
+main { padding: 28px 34px 90px; max-width: 1400px; }
+main > .prose, main > .commit, main > .problem { max-width: 800px; }
+
+/* The pair reads as one document: the story on the left, the criteria it is
+   held to on the right, so you can check one against the other. */
+.split { display: grid; grid-template-columns: 60fr 40fr; gap: 34px; align-items: start; }
+.col.bdd {
+  position: sticky; top: 68px; max-height: calc(100vh - 96px); overflow-y: auto;
+  /* the scroll box clips overflow, so pay back the heading rule's negative margin */
+  padding: 2px 4px 2px 14px;
+}
+.col.bdd > h2:first-child { margin-top: 0; }
+.col.bdd .steps { font-size: 13px; line-height: 1.8; }
+.col.bdd .scenario { margin: 14px 0; }
 .loading { color: var(--dim); }
 h1 { font-size: 25px; margin: 0 0 4px; letter-spacing: -.02em; }
-h2 { font-size: 17px; margin: 30px 0 10px; letter-spacing: -.01em; }
-h3 { font-size: 14.5px; margin: 20px 0 6px; }
+h2 { font-size: 17px; margin: 34px 0 12px; letter-spacing: -.01em; }
+h3 { font-size: 14.5px; margin: 22px 0 6px; }
+
+/* Sections are colour-coded so a feature file scans as parts rather than as
+   one page of prose. Known headings get their own hue; anything else falls
+   back to the accent, so this degrades on spec sets that name sections
+   differently. */
+h2.sec, h3.sec { color: var(--sec, var(--accent)); }
+h2.sec {
+  border-left: 3px solid currentColor; padding-left: 11px; margin-left: -14px;
+}
+h3.sec::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 2px;
+  background: currentColor; margin-right: 8px; vertical-align: 1px;
+}
+.sec-user-story   { --sec: var(--ready); }
+.sec-context      { --sec: var(--deferred); }
+.sec-scenarios,
+.sec-acceptance-criteria { --sec: var(--passing); }
+.sec-technical-notes,
+.sec-tasks        { --sec: var(--inprogress); }
+.sec-why, .sec-decisions { --sec: var(--deferred); }
+.sec-scope, .sec-features-touched { --sec: var(--ready); }
+.sec-notes-on-confirmation, .sec-notes-on-scope, .sec-review { --sec: var(--dim); }
 .sub { color: var(--dim); margin: 0 0 18px; }
 
 /* --- pills and cards ------------------------------------------------------ */
@@ -98,7 +133,10 @@ h3 { font-size: 14.5px; margin: 20px 0 6px; }
 .meta { color: var(--dim); font-size: 12.5px; display: flex; gap: 10px; flex-wrap: wrap; }
 
 /* --- gherkin -------------------------------------------------------------- */
-.scenario { border-left: 3px solid var(--line); padding-left: 14px; margin: 16px 0; }
+.scenario {
+  border-left: 3px solid color-mix(in srgb, var(--ink) 15%, transparent);
+  padding-left: 14px; margin: 16px 0;
+}
 .scenario.is-draft { border-left-color: var(--inprogress); }
 .scenario .name { font-weight: 620; margin-bottom: 7px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .scenario .kw { color: var(--dim); font-weight: 500; font-size: 12.5px; }
@@ -114,13 +152,23 @@ pre {
   background: color-mix(in srgb, var(--ink) 4%, transparent); padding: 11px 13px;
   border-radius: 8px; overflow-x: auto; font-size: 12.5px; line-height: 1.55;
 }
-:not(pre) > code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+:not(pre) > code {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: color-mix(in srgb, var(--ink) 62%, var(--accent));
+  padding: 1px 5px; border-radius: 4px; font-size: .9em;
+}
 
 /* --- prose ---------------------------------------------------------------- */
 .prose > :first-child { margin-top: 0; }
 .prose ul, .prose ol { padding-left: 22px; }
 .prose li { margin: 3px 0; }
-.prose blockquote { margin: 10px 0; padding-left: 13px; border-left: 3px solid var(--line); color: var(--dim); }
+.prose blockquote {
+  margin: 14px 0; padding: 10px 14px; border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0; color: var(--dim);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.prose strong { color: color-mix(in srgb, var(--ink) 84%, var(--accent)); }
+.prose li { margin: 5px 0; }
 .prose hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 
 /* --- history and diff ----------------------------------------------------- */
@@ -146,6 +194,10 @@ pre {
 .task.done .box { color: var(--passing); }
 .problem { border-left: 3px solid var(--failing); padding: 6px 12px; margin: 6px 0; font-size: 13.5px; }
 .empty { color: var(--dim); font-style: italic; }
+@media (max-width: 1080px) {
+  .split { grid-template-columns: 1fr; gap: 8px; }
+  .col.bdd { position: static; max-height: none; overflow: visible; }
+}
 @media (max-width: 820px) {
   #shell { grid-template-columns: 1fr; }
   #side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }

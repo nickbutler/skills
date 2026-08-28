@@ -46,6 +46,8 @@ function route(href) {
 /* Does this line open a new block? Anything that doesn't is a continuation of
    the one before it — markdown's lazy wrapping, which the spec templates use
    heavily in bullets and blockquotes. */
+const slug = t => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 const starts = line => /^(\s*(?:[-*]|\d+\.)\s|#{1,6}\s|>|\||```|\s*(?:-{3,}|\*{3,})\s*$)/.test(line);
 
 function markdown(src) {
@@ -78,7 +80,12 @@ function markdown(src) {
       continue;
     }
     const h = line.match(/^(#{1,6})\s+(.*)$/);
-    if (h) { closeList(); out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
+    if (h) {
+      closeList();
+      const n = h[1].length;
+      out.push(`<h${n} class="sec sec-${slug(h[2])}">${inline(h[2])}</h${n}>`);
+      i++; continue;
+    }
     if (/^\s*(-{3,}|\*{3,})\s*$/.test(line)) { closeList(); out.push('<hr>'); i++; continue; }
     if (/^>\s?/.test(line)) {                                   // blockquote, possibly wrapped
       closeList();
@@ -249,7 +256,9 @@ function viewOverview(main) {
 function scenarioNode(sc) {
   const box = el('div', 'scenario' + (sc.draft ? ' is-draft' : ''));
   const name = el('div', 'name');
-  name.append(el('span', 'kw', sc.keyword + ':'), el('span', null, sc.name));
+  // A Background has no name of its own; its keyword is the whole label.
+  name.append(el('span', 'kw', sc.background ? sc.keyword : sc.keyword + ':'));
+  if (!sc.background) name.append(el('span', null, sc.name));
   for (const t of sc.tags || []) name.append(el('span', 'tag' + (t === '@draft' ? ' draft' : ''), t));
   box.append(name);
 
@@ -308,11 +317,15 @@ async function viewFeature(main, slug, sha) {
     main.append(m);
   }
 
-  main.append(prose(withoutFrontMatter(f.markdown)));
-
-  main.append(el('h2', null, 'Scenarios'));
-  if (!f.parsed || !f.parsed.scenarios.length) main.append(el('p', 'empty', 'No scenarios.'));
-  else for (const sc of f.parsed.scenarios) main.append(scenarioNode(sc));
+  const split = el('div', 'split');
+  const left = el('div', 'col md');
+  const right = el('div', 'col bdd');
+  left.append(prose(withoutFrontMatter(f.markdown)));
+  right.append(el('h2', 'sec sec-scenarios', 'Scenarios'));
+  if (!f.parsed || !f.parsed.scenarios.length) right.append(el('p', 'empty', 'No scenarios.'));
+  else for (const sc of f.parsed.scenarios) right.append(scenarioNode(sc));
+  split.append(left, right);
+  main.append(split);
 
   main.append(el('h2', null, 'History'));
   const list = el('div');
