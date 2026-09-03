@@ -59,7 +59,7 @@ In order:
 - **Deprecated**: move to `specs/archived/<feature-slug>.md` with deprecation header (date, last commit, reason if known — prompt if unknown)
 - **Resolved gaps**: move content into the relevant spec file; add a brief "resolved" note in `GAPS.md`
 - **Ready `@draft` scenarios**: remove the `@draft` tag
-- **Obsolete entries**: remove with a one-line note in a history section if one exists
+- **Obsolete entries**: remove them. Git carries what was removed and when; the change that removed it carries why
 
 ## Update cross-cutting files
 
