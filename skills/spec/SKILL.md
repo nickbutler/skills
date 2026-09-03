@@ -208,6 +208,13 @@ It checks:
 - `ADR/` filenames are dated, and `ADR/INDEX.md` lists exactly the records on disk
 - each `changes/*.md` has a task checklist and links only to features that exist; an archived change has no open tasks
 
+It also enforces four rules this skill states but which used to rely on being obeyed:
+
+- **a scenario asserts something** — no `Then` step means the scenario passes vacuously. A `Background` is exempt; it is setup, not a conclusion
+- **no unresolved markers once the code has run** — `TBD`, `TODO`, `FIXME` or `NEEDS CLARIFICATION` in a feature marked `passing` or `failing`. A `ready` feature may still say `TBD (no code yet)`; that is honest. A `passing` one saying it is a contradiction
+- **locators are visible text** — `css=`, `xpath=` or `//tag[` in step text, which the browser vocabulary forbids. Deliberately narrow: a source path like `src/app.py` is legitimate subject matter for a tool that reads source trees, and matching those produces nothing but false positives
+- **a claimed feature is not entirely unreviewed** — `ready`, `passing` or `failing` while every scenario is still `@draft`. Only checked when the project has a step library; without one, `@draft` means "nothing runs this" rather than "nobody has read this"
+
 **Run it at the end of every mode, before reporting.** A `FAIL` is a real inconsistency in the spec set — fix the spec, never loosen the check. The summary line (feature counts by status, `@draft` scenario count) is the raw material for the report, so read its output rather than recounting by hand.
 
 What it deliberately does not check: whether a scenario is *correct*, whether a feature is worth having, or whether the spec matches the code. Those need judgement — that is what the modes and their checkpoints are for.

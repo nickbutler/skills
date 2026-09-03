@@ -20,6 +20,15 @@ ARCHIVED_RE = re.compile(r"(archived|" + "|".join(STATUSES) + r")\b")
 ADR_STATUSES = ("superseded", "deprecated", "accepted", "rejected", "proposed", "open")
 ADR_STATUS_RE = re.compile(r"(" + "|".join(ADR_STATUSES) + r")\b", re.I)
 STEP_KW = ("Given ", "When ", "Then ", "And ", "But ", "* ")
+# Statuses that claim the code exists and the scenarios were run.
+RAN = ("passing", "failing")
+# Statuses that claim the spec has been signed off.
+CLAIMED = ("ready", "passing", "failing")
+MARKER_RE = re.compile(r"\b(TBD|TODO|FIXME|NEEDS CLARIFICATION)\b")
+# Locator forms the browser vocabulary forbids. Deliberately narrow: source
+# paths like `src/app.py` are legitimate subject matter for tools that read
+# source trees, so matching those produces nothing but false positives.
+LOCATOR_RE = re.compile(r"(css=|xpath=|//\w+\[)")
 SCENARIO_RE = re.compile(r"^\s*(Scenario Outline|Scenario|Example)\s*:\s*(.*)$")
 STATUS_LINE_RE = re.compile(r"^\*\*Status\*\*:\s*(.+?)\s*$", re.M)
 STEP_DECL_RE = re.compile(
@@ -290,6 +299,39 @@ def validate(spec):
                     if not any(p.match(step["text"]) for p in spec["steps"]):
                         errors.append(f"{rel(f['feature'])}: scenario {sc['name']!r} uses an "
                                       f"undefined step and is not @draft: {step['text']!r}")
+
+    # --- quality: the rules the skill states but could not previously enforce
+    for slug, f in sorted(spec["features"].items()):
+        p = f["parsed"]
+        if not p:
+            continue
+        name = rel(f["feature"])
+        real = [sc for sc in p["scenarios"] if not sc["background"]]
+
+        for sc in p["scenarios"]:
+            # A Background is setup; only a scenario has to conclude something.
+            if not sc["background"] and not any(st["keyword"] == "Then" for st in sc["steps"]):
+                errors.append(f"{name}: scenario {sc['name']!r} asserts nothing — it has no Then step")
+            for st in sc["steps"]:
+                if LOCATOR_RE.search(st["text"]):
+                    errors.append(f"{name}: scenario {sc['name']!r} locates by selector rather than "
+                                  f"visible text: {st['text']!r}")
+
+        # @draft means the phrasing is still unreviewed. A feature can only be
+        # entirely @draft and still claim sign-off when the project has no step
+        # library at all, where the tag means "nothing runs this" instead.
+        if spec["steps"] is not None and f["status"] in CLAIMED and real \
+                and all(sc["draft"] for sc in real):
+            errors.append(f"features/{slug}.md is {f['status']} but every scenario is still @draft")
+
+    for slug, f in sorted(spec["features"].items()):
+        if f["status"] not in RAN:
+            continue
+        for path in (f["md"], f["feature"]):
+            m = MARKER_RE.search(path.read_text()) if path else None
+            if m:
+                errors.append(f"{rel(path)} is {f['status']} but still carries {m.group(1)} — "
+                              f"a feature whose scenarios have run cannot have unresolved notes")
 
     adr = root / "ADR"
     if adr.is_dir():

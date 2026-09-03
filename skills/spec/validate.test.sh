@@ -99,7 +99,7 @@ empty_scenario(){ printf 'Feature: Login\n\n  Scenario: Nothing happens\n\n  Sce
 
 # --- legal Gherkin that isn't a step --------------------------------------
 narrative() {
-  printf 'Feature: Login\n  As a returning user\n  I want to sign in\n  So that I see my dashboard\n\n  Scenario: User signs in\n    Given I navigate to /login\n' \
+  printf 'Feature: Login\n  As a returning user\n  I want to sign in\n  So that I see my dashboard\n\n  Scenario: User signs in\n    Given I navigate to /login\n    Then I should see "Welcome"\n' \
     > "$1/specs/features/login.feature"
 }
 docstring_mermaid() {
@@ -190,6 +190,48 @@ piped_adr_desc() {
   sed -i.bak 's/| accepted | Storage choice |/| accepted | `sqlite | postgres` — sqlite wins |/' "$1/specs/ADR/INDEX.md"
 }
 
+# --- quality: a scenario must assert something ------------------------------
+set_status() {   # set_status <dir> <status>
+  sed -i.bak "s/\*\*Status\*\*: draft/**Status**: $2/" "$1/specs/features/login.md"
+  sed -i.bak "s/| draft |/| $2 |/" "$1/specs/INDEX.md"
+}
+no_assertion()   {
+  printf 'Feature: Login\n\n  Scenario: User signs in\n    Given I navigate to /login\n    When I click the Sign in button\n' \
+    > "$1/specs/features/login.feature"
+}
+background_only_given() {
+  printf 'Feature: Login\n\n  Background:\n    Given I navigate to /login\n\n  Scenario: User signs in\n    When I click the Sign in button\n    Then I should see "Welcome"\n' \
+    > "$1/specs/features/login.feature"
+}
+
+# --- quality: no unresolved markers once the code is claimed to run ---------
+marker_when_passing() { set_status "$1" passing; printf '\n- **Implementation locations**: TBD (no code yet)\n' >> "$1/specs/features/login.md"; }
+marker_when_ready()   { set_status "$1" ready;   printf '\n- **Implementation locations**: TBD (no code yet)\n' >> "$1/specs/features/login.md"; }
+marker_when_draft()   { printf '\n- **Implementation locations**: TBD (no code yet)\n' >> "$1/specs/features/login.md"; }
+
+# --- quality: locators must be visible text, never selectors ----------------
+css_locator()   { sed -i.bak 's|When I click the Sign in button|When I click "css=.btn-primary"|' "$1/specs/features/login.feature"; }
+xpath_locator() { sed -i.bak 's|When I click the Sign in button|When I click //div[@id="go"]|' "$1/specs/features/login.feature"; }
+
+# --- quality: a claimed feature cannot be entirely unreviewed ---------------
+all_draft_with_steps() {
+  with_steps "$1"
+  set_status "$1" ready
+  printf 'Feature: Login\n\n  @draft\n  Scenario: User signs in\n    Given I navigate to /login\n    Then I should see "Welcome"\n' \
+    > "$1/specs/features/login.feature"
+}
+all_draft_no_steps() {
+  set_status "$1" ready
+  printf 'Feature: Login\n\n  @draft\n  Scenario: User signs in\n    Given I navigate to /login\n    Then I should see "Welcome"\n' \
+    > "$1/specs/features/login.feature"
+}
+some_draft_with_steps() {
+  with_steps "$1"
+  set_status "$1" ready
+  printf 'Feature: Login\n\n  @draft\n  Scenario: A\n    Given I navigate to /login\n    Then I should see "Welcome"\n\n  Scenario: B\n    Given I navigate to /login\n    Then I should see "Welcome"\n' \
+    > "$1/specs/features/login.feature"
+}
+
 # --- ADR -------------------------------------------------------------------
 adr_orphan_file() { printf '# Use Redis\n\n**Status**: accepted\n' > "$1/specs/ADR/2026-02-02-use-redis.md"; }
 adr_phantom_row() { printf '| [2026-03-03-use-kafka](2026-03-03-use-kafka.md) | accepted | Queues |\n' >> "$1/specs/ADR/INDEX.md"; }
@@ -227,7 +269,7 @@ change_arch_unticked() { mk_change "$1"; archive_change "$1"; }
 
 # --- draft accounting ------------------------------------------------------
 two_drafts() {
-  printf 'Feature: Login\n\n  @draft\n  Scenario: A\n    Given I navigate to /login\n\n  @draft\n  Scenario: B\n    Given I navigate to /login\n' \
+  printf 'Feature: Login\n\n  @draft\n  Scenario: A\n    Given I navigate to /login\n    Then I should see "A"\n\n  @draft\n  Scenario: B\n    Given I navigate to /login\n    Then I should see "B"\n' \
     > "$1/specs/features/login.feature"
 }
 
@@ -263,6 +305,16 @@ check "Background in all-draft file ok"   0 "ok"                        undefine
 check "archived status in archived/ ok"   0 "ok"                        archived_status_ok
 check "live status in archived/ ok"       0 "ok"                        archived_live_status
 check "archived status in features/ fails" 1 "archived"                  live_archived_status
+check "scenario with no Then fails"       1 "assert"                     no_assertion
+check "Background needs no Then"          0 "ok"                         background_only_given
+check "TBD in a passing feature fails"    1 "TBD"                        marker_when_passing
+check "TBD in a ready feature is fine"    0 "ok"                         marker_when_ready
+check "TBD in a draft feature is fine"    0 "ok"                         marker_when_draft
+check "css selector in a step fails"      1 "css="                       css_locator
+check "xpath in a step fails"             1 "xpath\|//div"                xpath_locator
+check "all-draft claimed feature fails"   1 "draft"                      all_draft_with_steps
+check "all-draft ok with no step library" 0 "ok"                         all_draft_no_steps
+check "partly-draft claimed is fine"      0 "ok"                         some_draft_with_steps
 check "ADR file not in ADR INDEX fails"   1 "use-redis"                adr_orphan_file
 check "ADR INDEX row without file fails"  1 "use-kafka"                adr_phantom_row
 check "undated ADR filename fails"        1 "thoughts.md"              adr_bad_name
