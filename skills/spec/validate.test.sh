@@ -232,6 +232,48 @@ some_draft_with_steps() {
     > "$1/specs/features/login.feature"
 }
 
+# --- in-flight changes on other branches ------------------------------------
+# A change lives on its branch, so two of them cannot see each other. Only git
+# can, and only when there is a repo to ask.
+git_repo() {
+  git -C "$1" init -q .
+  git -C "$1" config user.email t@t
+  git -C "$1" config user.name T
+  git -C "$1" config commit.gpgsign false
+  git -C "$1" add -A
+  git -C "$1" commit -qm "specs"
+}
+change_on_branch() {   # change_on_branch <dir> <branch> <slug> <feature>
+  git -C "$1" checkout -q -b "$2"
+  mkdir -p "$1/specs/changes"
+  printf '# Change: %s\n\n## Features touched\n- [%s](../features/%s.md) — modified\n\n## Tasks\n- [ ] 1.1 Do it\n' \
+    "$3" "$4" "$4" > "$1/specs/changes/$3.md"
+  git -C "$1" add -A
+  git -C "$1" commit -qm "$3"
+  git -C "$1" checkout -q -
+}
+two_branches_one_feature() {
+  git_repo "$1"
+  change_on_branch "$1" feat/sso add-sso login
+  change_on_branch "$1" feat/2fa add-2fa login
+}
+two_branches_apart() {
+  git_repo "$1"
+  printf '# Logout\n\n**Status**: draft\n' > "$1/specs/features/logout.md"
+  printf 'Feature: Logout\n\n  Scenario: Out\n    Given I navigate to /out\n    Then I should see "Bye"\n' > "$1/specs/features/logout.feature"
+  printf '| [logout](features/logout.md) | draft | Signing out |\n' >> "$1/specs/INDEX.md"
+  git -C "$1" add -A && git -C "$1" commit -qm second
+  change_on_branch "$1" feat/sso add-sso login
+  change_on_branch "$1" feat/out add-out logout
+}
+merged_branch() {
+  git_repo "$1"
+  change_on_branch "$1" feat/sso add-sso login
+  change_on_branch "$1" feat/2fa add-2fa login
+  git -C "$1" merge -q --no-ff -m merge feat/sso
+}
+no_git_at_all() { :; }
+
 # --- ADR -------------------------------------------------------------------
 adr_orphan_file() { printf '# Use Redis\n\n**Status**: accepted\n' > "$1/specs/ADR/2026-02-02-use-redis.md"; }
 adr_phantom_row() { printf '| [2026-03-03-use-kafka](2026-03-03-use-kafka.md) | accepted | Queues |\n' >> "$1/specs/ADR/INDEX.md"; }
@@ -315,6 +357,11 @@ check "xpath in a step fails"             1 "xpath\|//div"                xpath_
 check "all-draft claimed feature fails"   1 "draft"                      all_draft_with_steps
 check "all-draft ok with no step library" 0 "ok"                         all_draft_no_steps
 check "partly-draft claimed is fine"      0 "ok"                         some_draft_with_steps
+check "colliding changes warn"            0 "in flight"                  two_branches_one_feature
+check "collision names both branches"     0 "feat/2fa"                   two_branches_one_feature
+check "changes on separate features ok"   0 "ok"                         two_branches_apart
+check "merged branch is not in flight"    0 "ok"                         merged_branch
+check "no git is not an error"            0 "ok"                         no_git_at_all
 check "ADR file not in ADR INDEX fails"   1 "use-redis"                adr_orphan_file
 check "ADR INDEX row without file fails"  1 "use-kafka"                adr_phantom_row
 check "undated ADR filename fails"        1 "thoughts.md"              adr_bad_name

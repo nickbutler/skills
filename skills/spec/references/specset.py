@@ -6,6 +6,7 @@ drift from this one, so there isn't one.
 """
 import json
 import re
+import pathlib
 import subprocess
 import sys
 from pathlib import Path
@@ -157,14 +158,17 @@ def index_rows(path, link_prefix):
 
 
 def parse_change(path):
-    body = path.read_text()
+    return parse_change_text(path.read_text(), path.stem, path.parent.name == "archive")
+
+
+def parse_change_text(body, slug, archived=False):
     tasks = [{"done": mark.lower() == "x", "text": text}
              for mark, text in re.findall(r"^\s*-\s*\[( |x|X)\]\s*(.+?)\s*$", body, re.M)]
-    title = next((l[2:].strip() for l in body.splitlines() if l.startswith("# ")), path.stem)
+    title = next((l[2:].strip() for l in body.splitlines() if l.startswith("# ")), slug)
     return {
-        "slug": path.stem,
+        "slug": slug,
         "title": title,
-        "archived": path.parent.name == "archive",
+        "archived": archived,
         "status": (STATUS_LINE_RE.search(body).group(1) if STATUS_LINE_RE.search(body) else None),
         "tasks": tasks,
         "features": re.findall(r"\]\((?:\.\./)?features/([^)]+)\.md\)", body),
@@ -240,7 +244,7 @@ def load(root):
 def validate(spec):
     """Structural invariants. Returns (errors, notes, summary)."""
     root = spec["root"]
-    errors, notes = [], []
+    errors, notes, warnings = [], [], []
     rel = lambda p: str(Path(p).relative_to(root))
 
     for sub in ("features", "archived"):
@@ -359,6 +363,15 @@ def validate(spec):
             if target not in spec["features"]:
                 errors.append(f"{where} references features/{target}.md, which does not exist")
 
+    claims = {}
+    for c in inflight(root, spec):
+        for target in c["features"]:
+            claims.setdefault(target, []).append(f"changes/{c['slug']}.md on {c['branch']}")
+    for target, holders in sorted(claims.items()):
+        if len(holders) > 1:
+            warnings.append(f"{len(holders)} changes in flight claim features/{target}.md: "
+                            + ", ".join(sorted(holders)))
+
     by_status = {}
     for f in spec["features"].values():
         key = f["status"] or "no status"
@@ -369,7 +382,7 @@ def validate(spec):
     if (root / "changes").is_dir():
         open_n = sum(1 for c in spec["changes"] if not c["archived"])
         summary += f", {open_n} open changes, {len(spec['changes']) - open_n} archived"
-    return errors, notes, summary
+    return errors, notes, summary, warnings
 
 
 def git(root, *args):
@@ -380,6 +393,54 @@ def git(root, *args):
         return r.stdout if r.returncode == 0 else ""
     except (OSError, subprocess.SubprocessError):
         return ""
+
+
+def branches(root):
+    """Local branches that are not already merged into HEAD.
+
+    A merged branch is finished work, not work in flight; without this filter
+    every feature branch ever cut stays on the board forever.
+    """
+    out = git(root, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+    live = []
+    for name in out.split():
+        if git(root, "rev-parse", "--abbrev-ref", "HEAD").strip() == name:
+            continue
+        merged = subprocess.run(("git", "-C", str(root), "merge-base",
+                                 "--is-ancestor", name, "HEAD"),
+                                capture_output=True)
+        if merged.returncode != 0:
+            live.append(name)
+    return live
+
+
+def inflight(root, spec):
+    """Open changes across every branch, not only the one checked out.
+
+    A change lives on its branch, so two in flight cannot see each other. Git
+    can see both, and this is the only place that asks it.
+    """
+    here = git(root, "rev-parse", "--abbrev-ref", "HEAD").strip()
+    found = [{**change_row_lite(c), "branch": here or "(no branch)", "current": True}
+             for c in spec["changes"] if not c["archived"]]
+    for branch in branches(root):
+        listing = git(root, "ls-tree", "-r", "--name-only", branch, "--", "changes/")
+        for path in listing.split():
+            if not path.endswith(".md") or "/archive/" in path:
+                continue
+            # `<rev>:<path>` resolves from the repo root; `./` makes it resolve
+            # from the specs directory, which is where ls-tree reported it.
+            body = git(root, "show", f"{branch}:./{path}")
+            if not body:
+                continue
+            found.append({**change_row_lite(parse_change_text(body, pathlib.PurePath(path).stem)),
+                          "branch": branch, "current": False})
+    return found
+
+
+def change_row_lite(c):
+    return {"slug": c["slug"], "title": c["title"], "features": c["features"],
+            "done": sum(1 for t in c["tasks"] if t["done"]), "total": len(c["tasks"])}
 
 
 def history(root, paths):
@@ -403,9 +464,11 @@ def main(argv):
         if not root.is_dir():
             print(f"FAIL: no such directory: {root}")
             return 1
-        errors, notes, summary = validate(load(root))
+        errors, notes, summary, warnings = validate(load(root))
         for e in errors:
             print(f"FAIL: {e}")
+        for w in warnings:
+            print(f"warn: {w}")
         for n in notes:
             print(f"note: {n}")
         print(("FAIL: " if errors else "ok: ") + summary)

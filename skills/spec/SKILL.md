@@ -179,6 +179,8 @@ It also enforces four rules this skill states but which used to rely on being ob
 - **locators are visible text** — `css=`, `xpath=` or `//tag[` in step text, which the browser vocabulary forbids. Deliberately narrow: a source path like `src/app.py` is legitimate subject matter for a tool that reads source trees, and matching those produces nothing but false positives
 - **a claimed feature is not entirely unreviewed** — `ready`, `passing` or `failing` while every scenario is still `@draft`. Only checked when the project has a step library; without one, `@draft` means "nothing runs this" rather than "nobody has read this"
 
+It also reports `warn:` lines, which do not affect the exit code. There is one: **two changes in flight claiming the same feature**. A change lives on its branch, so two of them cannot see each other — git can see both, and this is the only place that asks it. Sharing a feature may be deliberate and sequenced, so it is a heads-up rather than a defect; but finding it while both are still specs is far cheaper than finding it when the second one merges.
+
 **Run it at the end of every mode, before reporting.** A `FAIL` is a real inconsistency in the spec set — fix the spec, never loosen the check. The summary line (feature counts by status, `@draft` scenario count) is the raw material for the report, so read its output rather than recounting by hand.
 
 What it deliberately does not check: whether a scenario is *correct*, whether a feature is worth having, or whether the spec matches the code. Those need judgement — that is what the modes and their checkpoints are for.
@@ -200,6 +202,7 @@ What it gives you that reading the files does not:
 - **Cross-links followed** — a feature shows the changes that touch it; links between spec files navigate in-app rather than downloading a `.md`
 - **Decisions by state** — accepted, rejected and open records are coloured apart, so an open question never reads as settled
 - **Git history per feature** — the commits that touched either half of the pair, and the diff for any of them. `#/feature/<slug>/<sha>` is a shareable link straight to one
+- **Every change in flight, on every branch** — not just the one checked out. Each shows its branch, its task progress and the features it claims, with any feature claimed twice called out. Changes on other branches are read straight out of git, so they open and read like any other
 - **Validation inline** — the same findings `validate.sh` prints, with the failure count in the header
 
 Reach for it when reviewing a spec set you did not write, when a status looks wrong and you want the commit that changed it, or when showing the specs to someone who will not read a folder of markdown. It renders the spec set as it is — it will not tell you whether the specs are true.

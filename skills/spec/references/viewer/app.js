@@ -152,8 +152,10 @@ function renderHeader() {
   }
   const h = $('#health');
   const bad = SPEC.validation.errors.length;
-  h.className = 'health' + (bad ? ' bad' : '');
-  h.textContent = bad ? `${bad} problem${bad > 1 ? 's' : ''}` : 'valid';
+  const warn = (SPEC.validation.warnings || []).length;
+  h.className = 'health' + (bad ? ' bad' : warn ? ' warn' : '');
+  h.textContent = bad ? `${bad} problem${bad > 1 ? 's' : ''}`
+    : warn ? `${warn} warning${warn > 1 ? 's' : ''}` : 'valid';
 }
 
 function renderNav(filter = '') {
@@ -190,9 +192,13 @@ function renderNav(filter = '') {
     .map(f => link(`#/feature/${f.slug}`, f.title || f.slug, VAR(f.status),
       f.draft ? `${f.draft} draft` : '')));
 
-  const open = SPEC.changes.filter(c => !c.archived);
-  group('Changes', open.filter(c => hit(c.title) || hit(c.slug))
-    .map(c => link(`#/change/${c.slug}`, c.title, VAR('in progress'), `${c.done}/${c.total}`)));
+  // Every open change, on every branch — a change lives on its branch, so
+  // without this two in flight are invisible to each other.
+  group('In flight', (SPEC.inflight || [])
+    .filter(c => hit(c.title) || hit(c.slug) || hit(c.branch))
+    .map(c => link(changeHref(c), c.title,
+      c.current ? VAR('in progress') : VAR('ready'),
+      c.current ? `${c.done}/${c.total}` : c.branch)));
 
   // An open question must not look settled, and a rejection must stay visible:
   // negative and unresolved memory is the reason the log exists.
@@ -216,6 +222,20 @@ function renderNav(filter = '') {
 }
 
 /* --- views ---------------------------------------------------------------- */
+const changeHref = c => c.current
+  ? `#/change/${c.slug}`
+  : `#/change/${c.slug}/${encodeURIComponent(c.branch)}`;
+
+/* Features claimed by more than one change in flight. The change that lands
+   second inherits a conflict nobody saw coming; seeing it while both are still
+   specs is the cheapest moment to deal with it. */
+function collisions() {
+  const claims = {};
+  for (const c of SPEC.inflight || [])
+    for (const f of c.features) (claims[f] = claims[f] || []).push(c);
+  return Object.entries(claims).filter(([, cs]) => cs.length > 1);
+}
+
 function viewOverview(main) {
   main.append(el('h1', null, SPEC.name));
   main.append(el('p', 'sub', SPEC.validation.summary));
@@ -239,15 +259,29 @@ function viewOverview(main) {
   }
   main.append(grid);
 
-  const open = SPEC.changes.filter(c => !c.archived);
-  if (open.length) {
-    main.append(el('h2', null, 'Changes in flight'));
-    for (const c of open) {
+  const flight = SPEC.inflight || [];
+  if (flight.length) {
+    main.append(el('h2', 'sec sec-in-flight', 'Changes in flight'));
+    for (const [feature, cs] of collisions()) {
+      const warn = el('div', 'problem');
+      warn.append(el('strong', null, feature));
+      warn.append(document.createTextNode(
+        ` is claimed by ${cs.length} changes at once: ${cs.map(c => `${c.slug} (${c.branch})`).join(', ')}`));
+      main.append(warn);
+    }
+    for (const c of flight) {
       const card = el('div', 'card');
-      card.onclick = () => { location.hash = `#/change/${c.slug}`; };
+      card.onclick = () => { location.hash = changeHref(c); };
       card.style.cursor = 'pointer';
-      card.append(el('h3', null, c.title));
-      card.append(el('div', 'meta', `${c.done}/${c.total} tasks · touches ${c.features.join(', ') || '—'}`));
+      const head = el('div', 'meta');
+      head.style.marginBottom = '6px';
+      const b = el('span', 'pill', c.branch);
+      b.style.color = c.current ? VAR('in progress') : VAR('ready');
+      head.append(b);
+      if (c.current) head.append(el('span', 'tag', 'checked out'));
+      card.append(head, el('h3', null, c.title));
+      card.append(el('div', 'meta',
+        `${c.done}/${c.total} tasks · touches ${c.features.join(', ') || '—'}`));
       main.append(card);
     }
   }
@@ -370,10 +404,14 @@ async function openDiff(sha) {
   if (hit) hit.row.scrollIntoView({ block: 'nearest' });
 }
 
-async function viewChange(main, slug) {
-  const c = await get(`/api/change/${slug}`);
+async function viewChange(main, slug, branch) {
+  const c = await get(`/api/change/${slug}` + (branch ? `?branch=${encodeURIComponent(branch)}` : ''));
   const head = el('div', 'meta');
   head.append(pill(c.archived ? 'archived' : (c.status || 'in progress')));
+  if (c.branch) {
+    const b = el('span', 'tag', c.branch);
+    head.append(b);
+  }
   main.append(head, el('h1', null, c.title));
   const bar = el('div', 'progress');
   bar.style.maxWidth = '320px';
@@ -408,6 +446,7 @@ function viewValidate(main) {
   main.append(el('h1', null, v.ok ? 'Structure is valid' : 'Structural problems'));
   main.append(el('p', 'sub', v.summary));
   for (const e of v.errors) main.append(el('div', 'problem', e));
+  for (const w of v.warnings || []) main.append(el('div', 'problem warn', w));
   for (const n of v.notes) main.append(el('p', 'sub', n));
   if (v.ok) main.append(el('p', 'empty', 'Every structural invariant holds. This says nothing about whether the specs are true — only that the set is well formed.'));
 }
@@ -430,7 +469,7 @@ async function render() {
   try {
     switch (where[0]) {
       case 'feature': await viewFeature(main, where[1], where[2]); break;
-      case 'change': await viewChange(main, where[1]); break;
+      case 'change': await viewChange(main, where[1], where[2] && decodeURIComponent(where[2])); break;
       case 'adr': await viewAdr(main, where[1]); break;
       case 'doc': await viewDoc(main, where[1]); break;
       case 'gaps': await viewGaps(main); break;

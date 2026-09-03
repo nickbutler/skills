@@ -43,6 +43,7 @@ header {
   background: color-mix(in srgb, var(--passing) 14%, transparent); color: var(--passing);
 }
 .health.bad { background: color-mix(in srgb, var(--failing) 14%, transparent); color: var(--failing); }
+.health.warn { background: color-mix(in srgb, var(--inprogress) 16%, transparent); color: var(--inprogress); }
 
 /* --- layout --------------------------------------------------------------- */
 #shell { display: grid; grid-template-columns: 268px 1fr; align-items: start; }
@@ -193,6 +194,8 @@ pre {
 .task.done { color: var(--dim); }
 .task.done .box { color: var(--passing); }
 .problem { border-left: 3px solid var(--failing); padding: 6px 12px; margin: 6px 0; font-size: 13.5px; }
+.problem.warn { border-left-color: var(--inprogress); }
+.sec-in-flight { --sec: var(--inprogress); }
 .empty { color: var(--dim); font-style: italic; }
 @media (max-width: 1080px) {
   .split { grid-template-columns: 1fr; gap: 8px; }

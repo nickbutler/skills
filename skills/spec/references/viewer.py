@@ -10,7 +10,7 @@ import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import parse_qsl, unquote
 
 sys.path.insert(0, str(Path(__file__).parent))
 import specset
@@ -74,7 +74,8 @@ class Handler(BaseHTTPRequestHandler):
         self.json({"error": what}, code=404)
 
     def do_GET(self):
-        path = self.path.split("?")[0]
+        path, _, query = self.path.partition("?")
+        self.query = dict(parse_qsl(query))
         parts = [p for p in path.split("/") if p]
         try:
             if not parts:
@@ -101,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
         spec = specset.load(self.root)
 
         if route == "spec" and not rest:
-            errors, notes, summary = specset.validate(spec)
+            errors, notes, summary, warnings = specset.validate(spec)
             progress = {}
             for f in spec["features"].values():
                 key = f["status"] or "no status"
@@ -118,15 +119,16 @@ class Handler(BaseHTTPRequestHandler):
                           "description": spec["adr_index"].get(a["slug"], {}).get("description", "")}
                          for a in spec["adrs"].values()],
                 "gaps": spec["gaps"],
+                "inflight": specset.inflight(self.root, spec),
                 "progress": progress,
                 "validation": {"ok": not errors, "errors": errors, "notes": notes,
-                               "summary": summary},
+                               "warnings": warnings, "summary": summary},
             })
 
         if route == "validate" and not rest:
-            errors, notes, summary = specset.validate(spec)
+            errors, notes, summary, warnings = specset.validate(spec)
             return self.json({"ok": not errors, "errors": errors, "notes": notes,
-                              "summary": summary})
+                              "warnings": warnings, "summary": summary})
 
         if route == "feature" and len(rest) == 1:
             slug = safe(rest[0])
@@ -163,10 +165,20 @@ class Handler(BaseHTTPRequestHandler):
 
         if route == "change" and len(rest) == 1:
             slug = safe(rest[0])
+            branch = safe(self.query["branch"], SAFE_REF) if "branch" in self.query else None
+            if branch:
+                # The file is not in the working tree; read it out of the branch.
+                body = specset.git(self.root, "show", f"{branch}:./changes/{slug}.md")
+                if not body:
+                    return self.missing(f"no change {slug!r} on {branch!r}")
+                c = specset.parse_change_text(body, slug)
+                return self.json({**change_row(c), "branch": branch, "tasks": c["tasks"],
+                                  "body": c["body"]})
             c = next((c for c in spec["changes"] if c["slug"] == slug), None)
             if not c:
                 return self.missing()
-            return self.json({**change_row(c), "tasks": c["tasks"], "body": c["body"]})
+            return self.json({**change_row(c), "branch": None, "tasks": c["tasks"],
+                              "body": c["body"]})
 
         if route == "adr" and len(rest) == 1:
             slug = safe(rest[0])

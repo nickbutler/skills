@@ -75,6 +75,20 @@ git add -A && git commit -qm "Add the login spec"
 printf '\n## Context\n\nSecond commit.\n' >> specs/features/login.md
 git add -A && git commit -qm "Note the login context"
 
+# a second change, in flight on its own branch, claiming the same feature
+git checkout -q -b feat/2fa
+cat > specs/changes/add-2fa.md <<'EOF'
+# Change: Add two-factor
+
+## Features touched
+- [login](../features/login.md) — modified
+
+## Tasks
+- [ ] 1.1 Send the code
+EOF
+git add -A && git commit -qm "Propose 2FA"
+git checkout -q -
+
 # --- start the server -------------------------------------------------------
 port="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
 "$here/view.sh" "$repo/specs" --port "$port" --no-open >"$tmp/server.log" 2>&1 &
@@ -131,6 +145,18 @@ ok "change task counts"             "/api/spec" 'd["changes"][0]["done"] == 1 an
 ok "index lists ADRs"               "/api/spec" 'd["adrs"][0]["slug"] == "2026-01-01-use-sqlite"'
 ok "ADR status is a token"          "/api/spec" 'd["adrs"][0]["status"] == "accepted"'
 ok "ADR keeps the whole line"       "/api/spec" '"Affects" in d["adrs"][0]["raw_status"]'
+
+# --- changes in flight on other branches ------------------------------------
+ok "in flight lists other branches" "/api/spec" 'any(c["branch"] == "feat/2fa" for c in d["inflight"])'
+ok "in flight carries the slug"     "/api/spec" 'any(c["slug"] == "add-2fa" for c in d["inflight"])'
+ok "in flight names its features"   "/api/spec" 'any(c["features"] == ["login"] for c in d["inflight"])'
+ok "current branch marked current"  "/api/spec" 'any(c["current"] and c["slug"] == "add-sso" for c in d["inflight"])'
+ok "collision surfaces as a warning" "/api/validate" 'any("feat/2fa" in w for w in d["notes"] + d.get("warnings", []))'
+
+ok "a branch change is readable"    "/api/change/add-2fa?branch=feat/2fa" '"Send the code" in d["body"]'
+ok "branch change knows its branch" "/api/change/add-2fa?branch=feat/2fa" 'd["branch"] == "feat/2fa"'
+status "branch change needs a branch" "/api/change/add-2fa" 404
+status "unknown branch is 404"        "/api/change/add-2fa?branch=feat/nope" 404
 
 # --- one feature ------------------------------------------------------------
 ok "feature returns markdown"    "/api/feature/login" '"returning user" in d["markdown"]'

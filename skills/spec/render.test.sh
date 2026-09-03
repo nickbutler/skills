@@ -91,6 +91,19 @@ cat > specs/INDEX.md <<'EOF'
 | [alias](features/alias.md) | draft | Learned aliases |
 EOF
 git add -A && git commit -qm "Add specs"
+mkdir -p specs/changes
+git checkout -q -b feat/ladder
+cat > specs/changes/tune-ladder.md <<'EOF'
+# Change: Tune the ladder
+
+## Features touched
+- [resolution](../features/resolution.md) — modified
+
+## Tasks
+- [ ] 1.1 Raise the floor
+EOF
+git add -A && git commit -qm "Propose ladder tuning"
+git checkout -q -
 
 port="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
 "$here/view.sh" "$repo/specs" --port "$port" --no-open >"$tmp/server.log" 2>&1 &
@@ -192,6 +205,7 @@ check_side "ADR listed by name"      '"ladder-order" in main'
 check_side "ADR shows its status"    '">accepted<" in main'
 check_side "no raw status in nav"    '"Affects" not in main'
 check_side "decision state classed"  '"adr-accepted" in main'
+check_side "in-flight branch listed" '"feat/ladder" in main'
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]
