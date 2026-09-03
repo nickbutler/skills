@@ -1,7 +1,6 @@
 ---
 name: commit-msg
-description: Generate a git commit message from the current staged/unstaged changes and deliver it the way the user chose for this session — written to the repo's NEXT_COMMITMSG file (worktree-aware), shown in the chat only, or used to create the commit. Use when the user types /commit-msg or asks you to generate a commit message, draft a commit, or write a commit suggestion.
-argument-hint: [scope]
+description: Generate a git commit message from the current staged/unstaged changes and deliver it the way the user chose for this session — written to the repo's NEXT_COMMITMSG file (worktree-aware), shown in the chat only, or used to create the commit. Use when the user types /commit-msg or asks you to generate a commit message, draft a commit, or write a commit suggestion. Accepts an optional scope, which prefixes the subject line: `/commit-msg auth` gives `auth: add JWT refresh`.
 allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git add:*), Bash(git commit:*), Bash(git rev-parse:*), AskUserQuestion, Read, Write
 ---
 

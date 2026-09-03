@@ -9,13 +9,13 @@ Generate and maintain a structured spec set: a flat list of feature files with G
 
 ## Mode dispatch
 
-| Command | When to use |
-|---|---|
-| `/spec create` | No code yet — design a spec from a conversation or planning discussion |
-| `/spec infer` | Code exists, no `specs/` folder — reverse-engineer specs from the codebase |
-| `/spec change` | `specs/` folder exists — propose a specific change to build, as a reviewable spec delta plus tasks |
-| `/spec update` | `specs/` folder exists — reconcile specs with code that has already changed |
-| `/spec upgrade` | `specs/` folder was written against an older version of this skill — reconcile it with the current conventions |
+| Command | When to use | Workflow |
+|---|---|---|
+| `/spec create` | No code yet — design a spec from a conversation or planning discussion | `references/mode-create.md` |
+| `/spec infer` | Code exists, no `specs/` folder — reverse-engineer specs from the codebase | `references/mode-infer.md` |
+| `/spec change` | `specs/` folder exists — propose a specific change to build, as a reviewable spec delta plus tasks | `references/mode-change.md` |
+| `/spec update` | `specs/` folder exists — reconcile specs with code that has already changed | `references/mode-update.md` |
+| `/spec upgrade` | `specs/` folder was written against an older version of this skill — reconcile it with the current conventions | `references/mode-upgrade.md` |
 
 **Auto-detect when no mode is given:**
 1. No `specs/`, no codebase → **create**
@@ -28,6 +28,8 @@ Generate and maintain a structured spec set: a flat list of feature files with G
 **update vs upgrade**: update reconciles the specs with the *code*; upgrade reconciles them with *this skill*. A feature whose behaviour changed is an update. A feature that is fine but sits in a spec set predating `changes/`, dated ADR filenames or the quality checks is an upgrade. Doing an update on a set that needs upgrading buries real drift under formatting noise.
 
 **change vs update** is the distinction to get right: **change** runs *before* the code, and the spec delta is the thing being agreed; **update** runs *after* the code, and the spec is catching up to reality. If code has already been written for the work in question, it is an update, not a change.
+
+**Once the mode is settled, read its workflow file and follow it.** The rest of this file is what every mode shares — structure, disciplines, statuses, validation. It is not enough on its own: each mode has its own checkpoints, its own principles, and its own definition of what may be written down. Do not improvise a workflow from the shared sections.
 
 ---
 
@@ -85,7 +87,7 @@ When a scenario requires a step that doesn't exist, write the natural Gherkin ph
 
 Steps live at one of two levels. Keep them separate — do not mix levels within a scenario.
 
-**Layer 1 — Interactions**: single primitive actions from the project's vocabulary (see below). Used in feature files that document a task directly.
+**Layer 1 — Interactions**: single primitive actions from the project's vocabulary (`references/step-vocabulary.md`). Used in feature files that document a task directly.
 
 **Layer 2 — Tasks**: named compositions of interactions representing a meaningful user action. Task steps appear as `Given` preconditions in higher-level feature files. Their implementations call interaction-layer steps.
 
@@ -121,53 +123,9 @@ Scenario: Complete a purchase
 
 ### Primitive vocabulary (Layer 1)
 
-The primitive vocabulary is domain-dependent. This skill ships two reference vocabularies — **browser** and **CLI**. Use the one that fits the project's interface; a single project may use both (e.g. a CLI tool with a web UI). When the project's domain fits neither (e.g. a mobile app, a message-queue consumer, an API-only service), establish a new primitive family in `GAPS.md` and get confirmation before writing any feature files.
+The primitive vocabulary is domain-dependent. **Read `references/step-vocabulary.md` before writing any scenario** — it holds the two reference vocabularies this skill ships, **browser** and **CLI**, and the rules for parameterising them. Use whichever fits the project's interface; a single project may use both.
 
-Parameters use `{curly_braces}`.
-
-**Browser** — locators use visible text or label; never CSS selectors, XPath, or element IDs.
-
-| Step | Category | Notes |
-|---|---|---|
-| `I navigate to {url}` | Navigation | Absolute or root-relative URL |
-| `I click the {text} link` | Interaction | Matches visible link text |
-| `I click the {text} button` | Interaction | Matches button label |
-| `I click {text}` | Interaction | Any clickable element; use typed variants above when unambiguous |
-| `I fill in {field} with {value}` | Input | `{field}` is the input label or placeholder |
-| `I select {option} from {field}` | Input | For `<select>` elements |
-| `I check {field}` | Input | Checkbox by label |
-| `I uncheck {field}` | Input | Checkbox by label |
-| `I submit the form` | Input | Submits the active form |
-| `I should see {text}` | Assertion | Visible text anywhere on the page |
-| `I should not see {text}` | Assertion | |
-| `I should be on {path}` | Assertion | URL path match |
-| `the {field} field should contain {value}` | Assertion | |
-| `the {field} field should be empty` | Assertion | |
-| `the {text} button should be disabled` | Assertion | |
-| `the {text} button should be enabled` | Assertion | |
-| `I should see an error {text}` | Assertion | For inline validation messages |
-
-**CLI** — commands are subcommand-and-flags only; path arguments go in a separate `at path "{path}"` clause. Values go in step text, not fixture names — step definitions stay generic and parameterised.
-
-When a scenario needs to reference the per-test temp directory inside a command string or a path argument, write the literal token `{tmp}` in the feature file — e.g. `When I run command "init {tmp}/workspace"`. The step definition is responsible for substituting `{tmp}` with the actual `tmp_path` (or framework equivalent) at runtime. This keeps feature files portable across environments and free of absolute paths, while letting step text remain self-describing. Bare relative paths in non-command step text (e.g. `the directory "workspace/raw"`) are resolved against `tmp_path` directly by the step definition — no `{tmp}` prefix needed there.
-
-| Step | Category | Notes |
-|---|---|---|
-| `I run command "{command}"` | Invocation | Subcommand and flags only, e.g. `"init"`, `"collect --all"` |
-| `I run command "{command}" at path "{path}"` | Invocation | As above, with explicit working directory |
-| `the last command should succeed` | Assertion | Exit code 0 |
-| `the last command should fail` | Assertion | Non-zero exit code |
-| `the last command should exit with code {code}` | Assertion | Specific exit code |
-| `the last command output should contain "{text}"` | Assertion | Match against stdout/stderr |
-| `the file "{path}" exists` | State | Pre-state: file present |
-| `the file "{path}" does not exist` | State | Pre-state: file absent |
-| `the directory "{path}" exists` | State | Pre-state: directory present |
-| `the directory "{path}" does not exist` | State | Pre-state: directory absent |
-| `the file "{path}" should exist` | Assertion | Post-state: file was created |
-| `the file "{path}" should not exist` | Assertion | Post-state: file was not created |
-| `the directory "{path}" should exist` | Assertion | Post-state: directory was created |
-| `the directory "{path}" should not exist` | Assertion | Post-state: directory was not created |
-| `the file "{path}" should contain "{text}"` | Assertion | File content match |
+When the project's domain fits neither (a mobile app, a message-queue consumer, an API-only service), establish a new primitive family in `GAPS.md` and get confirmation before writing any feature files. Never invent a one-off interaction step inside a scenario.
 
 ## Shared: progress tracking
 
@@ -195,11 +153,13 @@ Change files carry their own `**Status**:` — `proposed` (written, not yet agre
 
 ## Shared: validation
 
-`validate.sh` ships with this skill (same directory). It checks the structural invariants of a spec set deterministically — no model in the loop, so it cannot be talked into a pass.
+`validate.sh` ships beside this file. It checks the structural invariants of a spec set deterministically — no model in the loop, so it cannot be talked into a pass.
 
 ```sh
-validate.sh [specs-dir]     # default: ./specs — exits non-zero on any FAIL
+<skill-dir>/validate.sh [specs-dir]     # default: ./specs — exits non-zero on any FAIL
 ```
+
+`<skill-dir>` is the directory holding this `SKILL.md`; in Claude Code that is `${CLAUDE_SKILL_DIR}`. The scripts take the spec set as an argument and hold no state, so they run from any working directory and need nothing installed in the project.
 
 It checks:
 
@@ -225,10 +185,10 @@ What it deliberately does not check: whether a scenario is *correct*, whether a 
 
 ## Shared: viewing
 
-`view.sh` ships with this skill. It serves the spec set as a browsable site and opens it.
+`view.sh` ships beside this file. It serves the spec set as a browsable site and opens it.
 
 ```sh
-view.sh [specs-dir] [--port N] [--no-open]     # default: ./specs, ctrl-c to stop
+<skill-dir>/view.sh [specs-dir] [--port N] [--no-open]     # default: ./specs, ctrl-c to stop
 ```
 
 It is **read-only** — no write endpoints, no state, nothing touched in the working tree — so it is safe to leave running while you edit, rebase or switch branches. Refresh to see the current files; there is no build step and no cache.
@@ -244,9 +204,17 @@ What it gives you that reading the files does not:
 
 Reach for it when reviewing a spec set you did not write, when a status looks wrong and you want the commit that changed it, or when showing the specs to someone who will not read a folder of markdown. It renders the spec set as it is — it will not tell you whether the specs are true.
 
-## Shared: templates
+## Shared: reference files
 
-All templates are in `references/templates/`. Read each one just-in-time — only when you're about to generate that file. Do not load all templates upfront.
+Everything below `references/` is read just-in-time — when you are about to do the thing it covers, and not before. Do not load them upfront.
+
+| File | Read it when |
+|---|---|
+| `mode-<mode>.md` | the mode is settled — this is the workflow, and it is mandatory |
+| `step-vocabulary.md` | before writing any scenario |
+| `templates/*.template` | you are about to generate that particular file |
+
+The templates:
 
 | Template | Used by |
 |---|---|
@@ -260,456 +228,6 @@ All templates are in `references/templates/`. Read each one just-in-time — onl
 | `change.md.template` | change mode |
 | `gaps.md.template` | all modes |
 | `sync-report.md.template` | update mode |
-
----
-
-## Mode: create
-
-Design a spec set from a planning conversation, before any code exists. Specs here are **prescriptive** (defining intent) rather than descriptive (observing behaviour).
-
-### When to use
-
-- Planning a new project or feature before writing code
-- The design discussion is in this conversation and should be captured as structured specs
-- Neither code nor a `specs/` folder exists yet
-
-### When NOT to use
-
-- Code already exists → use **infer**
-- `specs/` already exists → use **update**
-
-### Additional principles
-
-**Vocabulary first.** Establish domain language before writing scenarios. The terms defined here become the terms used in code — consistency from spec to implementation prevents drift before it starts.
-
-**Open questions are first-class.** Design gaps are decisions deferred, not failures. Track them as open `ADR/` records with enough context that they can be answered when implementation begins. Papering over uncertainty produces specs that mislead.
-
-**MVP scope explicit.** Distinguish what's in scope for the first iteration from what's a later phase.
-
-**Scenarios are implementation-agnostic.** Write acceptance criteria at the behaviour level. Save implementation hints for `Technical notes`; don't over-specify approach in Gherkin.
-
-### GAPS.md in create mode
-
-Gaps here are spec-level ambiguities — the design discussion wasn't specific enough to write a complete scenario. Unlike infer mode, there's no code to inspect; these require further design work. Use "What was discussed" in place of "Where you looked".
-
-### Workflow
-
-#### 0. Cold-start interview (skip if context already exists)
-
-If the skill is invoked with no prior conversation — empty chat, blank project directory, or a bare `/spec create` with no description — do not attempt to synthesise; there is nothing to synthesise yet. Instead, conduct a short structured interview.
-
-Ask questions **one at a time**, in this order. Use earlier answers to skip questions that are already answered. Stop as soon as all must-have questions are resolved — do not ask nice-to-have questions if the picture is already clear enough to draft.
-
-**Must-have (always ask if unanswered):**
-
-1. *"What does it do, and who is it for?"* — the one-sentence pitch
-2. *"Who are the different types of users?"* — distinct actors; may be implicit in the answer to 1
-3. *"What are the 3–5 core things users need to be able to do?"* — jobs to be done
-4. *"What's essential for the first version, and what can wait?"* — MVP boundary
-
-**Strongly useful (ask if still unclear after the above):**
-
-5. *"What is explicitly out of scope?"* — prevents the feature list from expanding unboundedly
-6. *"What platform or interface?"* — web app, mobile, CLI, API, or combination
-
-**Nice to have (ask only if relevant and not yet answered):**
-
-7. *"Are there existing systems this needs to integrate with or replace?"*
-8. *"Any hard constraints — compliance, performance, specific tech stack?"*
-
-Keep questions short and conversational. Do not present them as a numbered list to the user — ask naturally, one at a time, and acknowledge each answer before asking the next. Once the must-haves are covered, proceed to step 1.
-
-#### 1. Elicitation summary
-
-Synthesise from the conversation (or interview answers from step 0):
-
-- **Product/feature**: what it does and for whom (one sentence)
-- **Actors**: who uses the system and in what roles
-- **Core goals**: outcomes actors are trying to achieve (3–6 items)
-- **Constraints**: technical, legal, timeline, or product constraints explicitly mentioned
-- **Non-functional requirements**: only what was stated
-- **Domain vocabulary**: key terms and their definitions as used in the discussion
-- **Scope signals**: anything explicitly said to be in or out of scope
-
-Flag any category with insufficient signal — those become initial open records in `ADR/`.
-
-Also identify from the conversation:
-- **Design principles**: any "how we build" rules stated or implied — architectural patterns, coding philosophy, team norms
-- **Constraints**: hard limits mentioned — technical, legal, operational, or organisational
-
-If neither has been stated, ask before proceeding to feature enumeration. These shape how every feature is described and what belongs in Technical notes — they cannot be retrofitted cleanly once features are written.
-
-**Stop. Let the user correct or extend the elicitation summary before proceeding.**
-
-#### 2. Feature enumeration
-
-Draft the full feature list — each with a one-line user-facing description, the actor, and an MVP / later-phase label. This is the complete map of the system, not a shortlist.
-
-**Stop. Confirm the feature list before scaffolding or writing any feature files.**
-
-#### 3. Scaffold
-
-Create directory structure and stub files: `INDEX.md` (stub), `ARCHITECTURE.md` (stub — sections present, content TBD), `ADR/` (INDEX.md plus a record for each decision and open question surfaced so far), `GAPS.md` (empty structure), and `features/` (empty).
-
-If the project has entities, records, or structured data that will be persisted or shared across features, also create `DATA_MODEL.md` (stub). If it is not obvious from the conversation, ask: *"Does this project have a data model — entities or records that need defining?"*
-
-**Stop. Confirm structure before populating.**
-
-#### 4. First feature
-
-Generate one feature file in full, with these adaptations:
-- `Technical notes` → populate what's known; use `TBD: <question>` for undecided implementation details; each TBD should also appear as an open record in `ADR/`
-- `Relevant principles / constraints` → identify which entries from `ARCHITECTURE.md` shape this feature's implementation; if ARCHITECTURE.md is not yet populated, note what principles apply based on the discussion so far
-- `Notes on confirmation` → rename to `Notes on scope`; flag scenarios that are inferred from discussion (not explicitly stated), edge cases not discussed, or contingent on an open decision
-
-**Stop. Get explicit feedback before applying the format to remaining features.**
-
-#### 5. Remaining features → Finalise → Report
-
-Generate remaining features. Complete `INDEX.md`. Run `validate.sh specs` and fix what it flags. Populate `ARCHITECTURE.md` with the cross-cutting design that emerged from the discussion — key abstractions, module boundaries, and the structural choices that span multiple features. Write an `ADR/` record for each choice and open question from the session and complete `ADR/INDEX.md`. Report: file tree, domain vocabulary established, count of open decisions, count of spec gaps, count of `@draft` scenarios needing step implementation, recommended next step.
-
----
-
-## Mode: infer
-
-Reverse-engineer a structured spec set from an existing codebase and its documentation. Specs here are **descriptive** (observing confirmed behaviour).
-
-### When to use
-
-- Code exists but no `specs/` folder
-- Generating specs, user stories, or Gherkin scenarios from existing source code
-- Setting up a BDD spec structure for a working system
-
-### When NOT to use
-
-- No code exists yet → use **create**
-- `specs/` already exists → use **update**
-
-### Additional principles
-
-**Confirmed-only.** Only include behaviour traceable to source code, existing docs, or tests. Do not infer. Do not extrapolate. Speculative content goes to `GAPS.md`.
-
-### Confirmed vs gap — strict rules
-
-A spec item is **confirmed** if at least one of:
-1. The behaviour is implemented in source code you have read
-2. The behaviour is described in `PLAN.md` or `ARCHITECTURE.md`
-3. The behaviour is exercised by an existing test
-4. The behaviour is enforced by a type signature, schema, or validation rule you have inspected
-
-For UI flows, confirmation requires evidence of: the route handler, the rendering, the form/inputs, and the success/failure path. Partial evidence → GAPS.
-
-If you find yourself writing "the system probably…" or "this most likely…" — stop. That sentence belongs in `GAPS.md`.
-
-### Inputs to locate
-
-Read in this order, report which are missing:
-
-1. `PLAN.md` (or `ROADMAP.md`)
-2. `ARCHITECTURE.md` (or `docs/architecture.md`)
-3. `step_definitions/` (or `features/step_definitions/`, `tests/steps/`)
-4. `CLAUDE.md` / `AGENTS.md`
-5. The codebase itself
-
-If both `PLAN.md` and `ARCHITECTURE.md` are missing, ask before proceeding.
-
-### Workflow
-
-#### 1. Reconnaissance
-
-Read input documents. Build a map of the codebase (directory listing, outline-mode reading — don't load full files speculatively). Identify major user-facing capabilities and the existing step vocabulary.
-
-While reading, look for evidence of design principles and constraints in `CLAUDE.md`, `ARCHITECTURE.md`, `PLAN.md`, READMEs, or configuration. These may be explicit ("we use a layered architecture") or implicit (a consistent pattern across the codebase that reflects a deliberate choice).
-
-Report: what you found, then the full feature list — each with a one-line user-facing description. Include all confirmed user-facing capabilities, not a shortlist. Include a brief section on principles and constraints identified — and explicitly flag if none were found, prompting the user to state them before features are written.
-
-**Stop. Wait for the user to confirm the feature list and establish any missing principles / constraints.**
-
-#### 2. Scaffold
-
-Create directory structure and stub files: `INDEX.md` (begins with a plain-English product description, 1–2 sentences, no class names or file paths), `ARCHITECTURE.md` (stub), `ADR/` (INDEX.md stub), `GAPS.md`, and `features/` (empty).
-
-If the codebase has models, schemas, migrations, or structured data types, also create `DATA_MODEL.md` (stub — populate in step 4 from what you've read).
-
-**Stop. Confirm structure before populating.**
-
-#### 3. First feature
-
-Generate one feature file in full. Apply the confirmed-only rule strictly. Tag any scenario with `@draft` if it uses steps not yet in `step_definitions/`. In Technical notes, populate `Relevant principles / constraints` from `ARCHITECTURE.md` — which principles or constraints visibly shape how this feature is implemented.
-
-**Stop. Get explicit feedback on the first feature before applying the format to the rest.**
-
-#### 4. Remaining features → Finalise → Report
-
-Generate remaining features. Complete `INDEX.md`. Run `validate.sh specs` and fix what it flags. Populate `ARCHITECTURE.md` by synthesising from the codebase: key abstractions, module structure, system boundaries, and the major structural patterns observed. Write `ADR/` records for any structural choices that are visible in the code but whose rationale is not self-evident — status `accepted`, with the evidence as context — and complete `ADR/INDEX.md`. Report: file tree, what's covered and what's in GAPS, count of `@draft` scenarios needing step implementation, patterns or inconsistencies noticed (flag, do not fix).
-
----
-
-## Mode: change
-
-Propose a specific piece of work against an existing spec set, as a reviewable delta plus an implementation checklist. Specs here are **prescriptive** — like create mode, but bounded by a system that already exists.
-
-### When to use
-
-- A `specs/` folder exists and the user wants to build something new or alter existing behaviour
-- The question is "what would it take to add X" and the answer should be reviewable before code
-- A change spans several features and needs its scope agreed in one place
-
-### When NOT to use
-
-- No `specs/` folder → **create** or **infer** first; there is nothing to delta against
-- The code has already been written → **update**; the spec is catching up, not leading
-- A one-line correction to a spec that is simply wrong → just edit it, no change file
-
-### Additional principles
-
-**The feature files are the delta.** Edit `features/` in place on a branch. Never restate a requirement in the change file — it is a manifest, not a spec. Two copies of a requirement is exactly the drift this skill exists to prevent.
-
-**One change, one branch, one file.** If the work needs two independent reviews, it is two changes. A change file that touches half the feature set is a roadmap, not a change — split it.
-
-**Scope is a boundary, not a wish list.** The `Out` section is load-bearing. Anything discovered mid-change that falls outside it goes to `GAPS.md` or a follow-up change, not into this one.
-
-**Decisions become ADRs, not prose.** An architectural choice made during a change gets an `ADR/` record, linked from the change file. Consult existing records — including `rejected` ones — before proposing an approach, and record a new rejection when one is turned down. The change file archives; the ADR does not.
-
-**Tasks derive from the spec delta.** Each task traces to something the diff changed. If a task has no corresponding spec change, either the spec is incomplete or the task is scope creep — find out which.
-
-### Workflow
-
-#### 1. Locate
-
-Read `INDEX.md`, then `ARCHITECTURE.md`, `ADR/INDEX.md` (and any record that looks relevant, including rejected ones), and the feature files the change plausibly touches. Identify:
-
-- which existing features change behaviour, and how
-- which features are new
-- whether anything becomes obsolete
-- which existing decisions constrain the approach, and whether this change contradicts one
-
-Create the branch. Everything from here is reviewable as a diff.
-
-Report the affected-feature list and any decision that constrains the approach.
-
-**Stop. Confirm the blast radius before writing anything.**
-
-#### 2. Proposal
-
-Write `specs/changes/<change-slug>.md` from `references/templates/change.md.template` — Why, Scope (in *and* out), Features touched, Decisions. **Leave Tasks empty**; tasks derive from the spec delta and the delta does not exist yet.
-
-Where the change makes an architectural choice, write the `ADR/` record now and link it. Where the choice is genuinely open, write the record with status `open` and say in the change file that the delta depends on it.
-
-**Stop. Agree why and how big before touching a single feature file.**
-
-#### 3. Spec delta
-
-Edit `features/` in place:
-
-- **Modified features**: change the scenarios that change behaviour. Leave untouched scenarios alone — a scenario that still holds should not show up in the diff. Update Technical notes only where they are now wrong.
-- **New features**: full `.md` + `.feature` pair from the templates, status `ready`. Add to `INDEX.md`.
-- **Removed features**: move the pair to `archived/` with a deprecation header naming this change. Remove the `INDEX.md` row.
-
-Tag `@draft` on any scenario needing a step that doesn't exist yet — the same rule as every other mode.
-
-Set status to `ready` on everything the change touches, and run `validate.sh specs`.
-
-**Stop. The user reviews the delta with `git diff specs/`. This is the review that matters — the whole point of the mode is that it happens before implementation.**
-
-#### 4. Tasks
-
-Derive the implementation checklist from the delta. Each task is a unit a reviewer could verify on its own; number them `<group>.<n>`. Order them so the suite can go green in stages rather than all at the end.
-
-Where the project follows TDD, the scenarios *are* the failing tests — task 1 is normally implementing the `@draft` steps so they can run red.
-
-Write them into the change file, set its status to `in progress`, and re-run `validate.sh specs`.
-
-**Stop. Confirm the task list before implementing.**
-
-#### 5. Implement
-
-Implementation may happen in this session or elsewhere. Whoever does it:
-
-- ticks tasks as they land
-- moves touched features `ready` → `in progress` → `passing` as their scenarios go green, keeping `INDEX.md` in step
-- removes `@draft` tags as the steps behind them are implemented
-
-Do not tick a task or advance a status on the strength of code that has not been run. `passing` means the scenarios were executed and were green.
-
-#### 6. Archive
-
-When every task is ticked and every touched feature's scenarios are green:
-
-- move the change file to `changes/archive/<YYYY-MM-DD>-<change-slug>.md`, status `complete` (date completed)
-- confirm every touched feature is `passing` (or `deferred`, with a note), and `INDEX.md` agrees
-- recalculate the `INDEX.md` progress counts
-- run `validate.sh specs` — it will fail if the archived change still has an open task, or if `INDEX.md` has fallen out of step
-
-Report: features added / modified / archived, `@draft` scenarios still outstanding, ADR records written, and the `validate.sh` summary line.
-
----
-
-## Mode: update
-
-Reconcile an existing spec set with the current state of the codebase. Detect drift, surface deprecations, identify uncovered code.
-
-### When to use
-
-- A `specs/` folder already exists from a previous run or sync
-- Refreshing specs after a period of development
-- Detecting spec drift or staleness
-
-### When NOT to use
-
-- No `specs/` folder exists → use **infer** (or **create** if no code either)
-- Rewriting specs from scratch → use **infer** with explicit instruction to overwrite
-
-### Additional principles
-
-**Specs are lightly human-edited.** Assume human curation has occurred since last sync. Preserve human edits wherever the underlying behaviour hasn't changed.
-
-**Behaviour change drives spec change.** A refactor that preserves behaviour should not trigger a scenario update.
-
-**Surface, don't decide.** When intent is ambiguous (intentional removal or accidental regression?), prompt the user rather than guessing.
-
-**Never silently delete.** Removed features get archived to `specs/archived/`, not deleted.
-
-**Changes reviewed via git.** Apply changes directly to files. The user reviews via `git diff specs/` and commits, amends, or reverts as they choose.
-
-### Change detection (in preference order)
-
-1. **Git-based**: `git log -- specs/ | head -1` to find the last commit touching `specs/`, then diff from there to `HEAD`
-2. **Fallback**: compare file modification times between `specs/` and source directories
-
-Report the detection method used. This appears in `SYNC_REPORT.md`.
-
-### Categorisation
-
-For every spec feature, assign one of:
-- **Unchanged** — referenced code has not changed
-- **Drift candidate** — code changed in a way that may affect behaviour
-- **Refactor only** — code changed but behaviour appears preserved
-- **Deprecated candidate** — referenced code no longer exists
-
-For new or significantly-changed code with no matching feature: **Uncovered**
-
-For `GAPS.md` entries: **Resolved**, **Still open**, or **Obsolete**
-
-For `@draft` scenarios: **Ready** (steps now exist — remove tag), **Still pending** (steps not yet implemented — leave tag), or **Obsolete** (scenario removed)
-
-**Stop. Report the categorisation summary (numbers only). Confirm scope before applying changes.**
-
-### Applying changes
-
-In order:
-- **Refactor-only**: update technical notes (paths, type names) without touching scenarios
-- **Drift candidates**: update unambiguous changes; prompt the user on ambiguous ones
-- **Uncovered**: create feature files using `references/templates/feature.md.template`; apply confirmed-only rule
-- **Deprecated**: move to `specs/archived/<feature-slug>.md` with deprecation header (date, last commit, reason if known — prompt if unknown)
-- **Resolved gaps**: move content into the relevant spec file; add a brief "resolved" note in `GAPS.md`
-- **Ready `@draft` scenarios**: remove the `@draft` tag
-- **Obsolete entries**: remove with a one-line note in a history section if one exists
-
-### Update cross-cutting files
-
-- `INDEX.md`: add candidate features if new uncovered areas suggest them; recalculate progress counts
-- `ARCHITECTURE.md`: update when structural changes are detected — new modules, changed boundaries, revised abstractions; do not touch if the changes are behaviour-only
-- `DATA_MODEL.md`: update when entities are added, removed, or their fields/types change; if `DATA_MODEL.md` doesn't exist but the codebase now has meaningful persistent data, propose creating it
-- `ADR/`: add new records for structural choices made since the last sync; never rewrite existing records; keep `ADR/INDEX.md` in sync. A legacy `DESIGN_DECISIONS.md`, or any other convention drift, is **upgrade**'s job — say so and move on rather than migrating mid-sync
-- `GAPS.md`: open and newly-discovered gaps only
-- `changes/`: for each in-flight change, tick tasks the code shows are done; if every task is complete and the scenarios are green, propose archiving it. A change whose features have all drifted away from it is stale — surface it, don't quietly delete it
-
-### Finalise
-
-Run `validate.sh specs` and fix anything it flags. Write `specs/SYNC_REPORT.md` using `references/templates/sync-report.md.template`.
-
-Report: total files changed, clarifications requested and resolved, items deferred, pointer to `SYNC_REPORT.md`, suggestion to review via `git diff specs/`.
-
-### When to prompt the user
-
-Bundle clarification questions when possible. Ask (don't guess) when:
-- A behaviour change could be intentional contract change or accidental regression
-- A feature appears removed but might have been renamed
-- Multiple plausible mappings exist between new code and existing features
-
----
-
-## Mode: upgrade
-
-Bring a spec set written against an older version of this skill up to the current conventions. The specs are not wrong about the system — they are wrong about the format.
-
-### When to use
-
-- `validate.sh` fails on a set nobody has changed, because the checks are newer than the specs
-- The set predates `changes/`, the `ADR/` folder, dated record filenames, or the `DATA_MODEL.md` split
-- A spec set inherited from another project or another agent's conventions
-
-### When NOT to use
-
-- The code moved and the specs did not → **update**
-- The set is conformant and you want new work specced → **change**
-- There is no `specs/` folder → **infer**
-
-### Additional principles
-
-**`validate.sh` is the worklist.** There is no version marker in a spec set and there should not be one — a stamp says what a folder claims to be, the files say what it is. Read the files. Every finding is either mechanical or a question; nothing else is in scope.
-
-**Mechanical means derivable, not merely tedious.** A fix is mechanical only when the correct result is already determined by something in the repo — the feature file, git history, the template. Everything else is a question for the user, however obvious it looks.
-
-**Format only.** Upgrade never changes what a spec says. If a scenario is wrong about the system, that is an update, and it is out of scope here — note it and move on.
-
-**Idempotent.** Running upgrade on an already-current set changes nothing and says so. Never rewrite a file that is already conformant, so `git diff specs/` shows exactly what moved.
-
-### The two piles
-
-Sort every finding before touching anything.
-
-**Mechanical** — apply directly:
-
-| Finding | Fix |
-|---|---|
-| `INDEX.md` status disagrees with the feature file | The feature file wins; `INDEX.md` is a view of it. Rewrite the row |
-| Feature missing from `INDEX.md` | Add the row, status from the file, description from the feature's one-line summary if it has one, blank if not |
-| `INDEX.md` row for a file that does not exist | Remove it, and note the slug in the report in case it was a rename |
-| ADR filename without a date prefix | Rename to `<YYYY-MM-DD>-<slug>.md`, date from `git log --diff-filter=A` on that file; today only if git has nothing |
-| ADR on disk missing from `ADR/INDEX.md` | Add the row, status and description from the record |
-| Legacy `DESIGN_DECISIONS.md` | Split into one `ADR/` record per entry, dated from the entry or from git history, then delete the file |
-| Numbered feature slugs (`01-login.md`) | Rename the pair to `kebab-case`, update every link that points at them |
-| `archived/` feature with a live status | Set `archived (was <status>)` |
-| Missing `GAPS.md` or `ADR/INDEX.md` | Create from the template, empty |
-
-**Questions** — do not guess, and bundle them by kind rather than asking per file:
-
-| Finding | Ask |
-|---|---|
-| Feature with no `**Status**:` line | What is true of these? Offer the evidence you can see — whether the referenced code exists, whether tests cover it |
-| `passing`/`failing` feature still carrying `TBD` | Is the status optimistic, or is the note stale? |
-| Scenario with no `Then` | What was this meant to assert? A scenario nobody can answer for is a `GAPS.md` entry, not a guess |
-| `.feature` with no `.md`, or the reverse | Was the missing half never written, or deleted? |
-| Every scenario `@draft` on a claimed feature | Has the phrasing been reviewed, or is the status ahead of itself? |
-| Locator by selector | Rewrite to visible text — needs the user, who knows what the element says |
-
-Conventions `validate.sh` cannot see, and so worth checking by eye: whether `ARCHITECTURE.md` exists and still describes the current structure, whether a `DATA_MODEL.md` is warranted, and whether feature files carry the template's sections.
-
-### Workflow
-
-#### 1. Inventory
-
-Run `validate.sh specs`. Read `INDEX.md` and one or two feature files to see which conventions the set already follows. Sort every finding into the two piles above.
-
-Report: how many mechanical fixes, how many questions grouped by kind, and which conventions are absent entirely. Name anything you found that looks like *behaviour* drift rather than format, and say it is out of scope for this mode.
-
-**Stop. Confirm the plan — and confirm the split, because a fix in the wrong pile is a guess wearing a fact's clothes.**
-
-#### 2. Mechanical pass
-
-Apply the mechanical fixes. Touch nothing already conformant. Re-run `validate.sh specs`: the count should drop to exactly the question pile.
-
-**Stop. The user reviews with `git diff specs/`.**
-
-#### 3. Questions
-
-Work the question pile, bundled by kind — all the missing statuses in one exchange, all the stale `TBD`s in the next. Apply each answer as it arrives. Anything the user cannot answer now becomes a `GAPS.md` entry rather than a guess or a silent edit.
-
-#### 4. Finalise
-
-Run `validate.sh specs` and report: what was mechanical, what was answered, what is left and why, and any behaviour drift you spotted along the way with a recommendation to run `update` next. A set that still fails after an upgrade is fine as long as every remaining failure is recorded in `GAPS.md` with a reason.
 
 ---
 

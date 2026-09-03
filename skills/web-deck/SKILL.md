@@ -1,7 +1,6 @@
 ---
 name: web-deck
-description: Build a presentation as a bespoke single-file web app — a continuous scrollytelling canvas stepped through with the keyboard, markdown content layer, full-bleed layouts, pluggable design tokens, print-to-PDF static output — instead of PowerPoint/Slidev/Reveal. Use when the user wants a slide deck, pitch deck, ELT/exec presentation, RFP deck, or asks to turn content into slides with a polished web-native look and a PDF deliverable.
-argument-hint: [topic or content source]
+description: Build a presentation as a bespoke single-file web app — a continuous scrollytelling canvas stepped through with the keyboard, markdown content layer, full-bleed layouts, pluggable design tokens, print-to-PDF static output — instead of PowerPoint/Slidev/Reveal. Use when the user wants a slide deck, pitch deck, ELT/exec presentation, RFP deck, or asks to turn content into slides with a polished web-native look and a PDF deliverable. Accepts the deck's topic, or a path to the content it should be built from.
 ---
 
 # Web Deck — Stepped Scrollytelling Presentation Engine
