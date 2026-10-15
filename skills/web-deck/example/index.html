@@ -441,9 +441,14 @@ html.static .tl-bar span { opacity: 1; transition: none; }
 .quad-wrap {
   display: grid;
   grid-template-columns: auto 1fr;
+  grid-template-rows: 1fr auto;
   gap: 0.6rem;
-  height: min(calc(58 * var(--vh)), 34rem);
+  /* stretch into the slide body like a grid; a fixed cap left a short
+     letterbox with dead space beneath it on large screens */
+  align-self: stretch;
+  min-height: calc(40 * var(--vh));
   margin-top: clamp(1.5rem, calc(3 * var(--vh)), 3rem);
+  margin-bottom: clamp(1rem, calc(3 * var(--vh)), 2.5rem);
 }
 .quad {
   position: relative;
