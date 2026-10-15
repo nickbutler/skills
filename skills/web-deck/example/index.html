@@ -325,6 +325,10 @@ html.static .snap-marker { display: none; }
   background: var(--surface);
 }
 .media-frame img, .media-frame svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* @fit: contain — show the whole picture (portrait screenshots, diagrams)
+   instead of cropping it to the 16:9 frame */
+.media-frame.contain { aspect-ratio: auto; border: 0; background: none; justify-self: center; }
+.media-frame.contain img { width: auto; max-width: 100%; height: auto; max-height: calc(72 * var(--vh)); object-fit: contain; }
 
 /* compact cards for dense grids (@cols >= 4) */
 .card--sm { padding: clamp(0.8rem, calc(1.2 * var(--vw)), 1.2rem); }
@@ -1417,7 +1421,9 @@ space / ↓ to begin
 The rows below generate themselves from the chapter dividers — add a chapter, the agenda updates.
 
 ---
-@type: prose
+@type: media
+@image: assets/deck-source.png
+@fit: contain
 @eyebrow: Why
 ## PowerPoint is the bottleneck
 AI agents are dramatically better at building **web layouts against a design system** than at positioning boxes in slideware. So let them: write the content as markdown, hand the polish to the browser, and keep a `Cmd+P` PDF as the static deliverable.
@@ -2623,7 +2629,7 @@ const renderers = {
             )
             .join("")}
         </div>`
-      : `<div class="media-frame reveal" style="--d:0.2s">${s.cfg.image ? `<img src="${s.cfg.image}" alt="">` : PLACEHOLDER_SVG}</div>`;
+      : `<div class="media-frame${s.cfg.fit === "contain" ? " contain" : ""} reveal" style="--d:0.2s">${s.cfg.image ? `<img src="${s.cfg.image}" alt="">` : PLACEHOLDER_SVG}</div>`;
     return el(`<section id="${slug(s.title)}">
       ${headerHTML(s, false)}
       <div class="media-grid${flip}">
