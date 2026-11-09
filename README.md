@@ -95,7 +95,11 @@ Where a skill ships scripts, its tests sit beside them and run on their own:
 skills/spec/validate.test.sh     # the validator's rules
 skills/spec/view.test.sh         # the viewer's HTTP surface
 skills/spec/render.test.sh       # what the page renders, via headless Chrome (skips without it)
+skills/spec/zip.test.sh          # what the upload archive holds
 ```
+
+Claude chat and Cowork can't read a symlink — they only take uploads. `make spec.zip` builds the
+archive to upload at Customize > Skills on claude.ai, so re-run and re-upload after changing `spec`.
 
 [spec]: https://agentskills.io
 [dots]: https://github.com/nickbutler/dots
